@@ -1,0 +1,19 @@
+# Ignore python bytecoded files
+*.py[cod]
+*.[oa]
+*~
+*.bak
+*.so
+*.egg
+*.profraw
+# ignore coverage files
+.coverage*
+!.coveragerc
+.noseids
+htmlcov
+# editors and IDEs
+*.sw[a-z]
+*~
+.idea
+.vscode
+*.lock
