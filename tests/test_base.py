@@ -7,3 +7,5 @@ def test_create_universe_from_lammpsdatafile():
     u = md.Universe(dir_ + filename)
     a = u.atoms[0]
     assert len(a.coordinate) == 3
+    box = u.box
+    assert len(box) == 6

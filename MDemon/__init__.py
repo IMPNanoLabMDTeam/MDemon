@@ -30,7 +30,7 @@ _STRUCTURE_NAMES = ddict()
 _STRUCTURES = dlist()
 _PARTICLES = dlist()
 _TOPOLOGIES = dlist()
-
+_UNIVERSE_ATTRS = dlist()
 
 from .core import *
 from .reader import *

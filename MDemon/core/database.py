@@ -23,19 +23,19 @@ class Database(object):
         frees = Freeze(np.array([False for _ in range(n_atoms)]), sid=aid)
 
         attrs.extend((ixs, exists, silens, frees))
-        # attach the StructureAttrs
+        # attach the StructureAttrs and UniverseAttrs
         self.attrs = []
         for attr in attrs:
-            self.add_StructureAttr(attr)
+            self.add_Attr(attr)
 
         self.base = Family(database=self)
 
-    def add_StructureAttr(self, attr):
-        """Add a new StructureAttr to the Database.
+    def add_Attr(self, attr):
+        """Add a new Attr to the Database.
 
         Parameters
         ----------
-        attr : :class:`StructureAttr`
+        attr : :class:`StructureAttr` or :class:`UniverseAttr`
 
         """
         self.attrs.append(attr)

@@ -3,6 +3,7 @@ from scipy.sparse import csr_matrix
 
 from ..core.database import Database
 from ..core.structureattr import ID, Charge, Composition, Coordinate, Mass, Species
+from ..core.universe import Box, Time
 from .base import DynamicReaderBase, ReaderBase, squash_by
 
 # Sections will all start with one of these words
@@ -202,6 +203,8 @@ class DATAReader(ReaderBase):
             mtrx = self.bondsect2mtrx(sect, n_atoms, nentries)
             compo._update_source(mtrx, (sname, "Atom_Base"), -1)
 
+        attrs.append(Time(0))
+        attrs.append(Box(self._parse_box(head)))
         dbase = Database(ids=ids, attrs=attrs)
         return dbase
 
