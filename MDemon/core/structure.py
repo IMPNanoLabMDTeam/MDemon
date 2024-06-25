@@ -58,6 +58,7 @@ class _TopologyMeta(type):
 
 
 class _StructureAttrContainer(object):
+    _SETATTR_WHITELIST = []
 
     @classmethod
     def _subclass(cls):
@@ -94,8 +95,8 @@ class _StructureAttrContainer(object):
         if not (
             attr.startswith("_")  # 'private' allowed
             or attr in self._SETATTR_WHITELIST  # known attributes allowed
-            or hasattr(self, attr)
-        ):  # preexisting (eg properties) allowed
+            or hasattr(self, attr)  # preexisting (eg properties) allowed
+        ):
             raise AttributeError(f"Cannot set arbitrary attributes to a {type(self)}")
         # if it is, we allow the setattr to proceed by deferring to the super
         # behaviour (ie do it)

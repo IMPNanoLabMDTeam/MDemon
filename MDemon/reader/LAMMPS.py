@@ -3,7 +3,7 @@ from scipy.sparse import csr_matrix
 
 from ..core.database import Database
 from ..core.structureattr import ID, Charge, Composition, Coordinate, Mass, Species
-from ..core.universe import Box, Time
+from ..core.universe import Box, Timestep
 from .base import DynamicReaderBase, ReaderBase, squash_by
 
 # Sections will all start with one of these words
@@ -173,18 +173,21 @@ class DATAReader(ReaderBase):
         if "Atoms" not in sects:
             raise ValueError("Data file was missing Atoms section")
 
-        try:
-            ids, species, compo, attrs = self._parse_atoms(sects["Atoms"], masses)
-        except Exception:
-            errmsg = (
-                "Failed to parse atoms section.  You can supply a description "
-                "of the atom_style as a keyword argument, "
-                "eg mda.Universe(..., atom_style='id resid x y z')"
-            )
-            raise ValueError(errmsg) from None
+        # try:
+        ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
+        # except Exception:
+        #     errmsg = (
+        #         "Failed to parse atoms section.  You can supply a description "
+        #         "of the atom_style as a keyword argument, "
+        #         "eg mda.Universe(..., atom_style='id resid x y z')"
+        #     )
+        #     raise ValueError(errmsg) from None
 
         # create mapping of id to index (ie atom id 10 might be the 0th atom)
-        mapping = {atom_id: i for i, atom_id in enumerate(ids.source[("Atom_Base",)])}
+        mapping = {
+            atom_id: i
+            for i, atom_id in enumerate(ids._source_register[("Atom_Base",)].values)
+        }
         n_atoms = len(mapping)
 
         for sname, L, nentries in [
@@ -198,14 +201,13 @@ class DATAReader(ReaderBase):
             except KeyError:
                 id_, type, sect = [], [], []
             sid = (sname,)
-            ids._update_source(id_, sid, -1)
-            species._update_source(type, sid, -1)
-            mtrx = self.bondsect2mtrx(sect, n_atoms, nentries)
-            compo._update_source(mtrx, (sname, "Atom_Base"), -1)
+            ids._update_source(id_, sid)
+            dbase.ix._update_source(np.arange(len(id_)), (sname,))
+            species._update_source(type, sid)
+            mtrx, N, M = self.bondsect2mtrx(sect, n_atoms, nentries)
+            compo._update_source(mtrx, (sname, "Atom_Base"), N, M)
 
-        attrs.append(Time(0))
-        attrs.append(Box(self._parse_box(head)))
-        dbase = Database(ids=ids, attrs=attrs)
+        Box(self._parse_box(head), database=dbase)
         return dbase
 
     @staticmethod
@@ -218,8 +220,8 @@ class DATAReader(ReaderBase):
         for i in sect:
             col.extend(list(i))
         col = np.asarray(col)
-        mtrx = csr_matrix((data, (row, col)), shape=(N, M), dtype=np.float64)
-        return mtrx
+        values = np.array([row, col, data])
+        return values, N, M
 
     def read_DATA_timestep(self, n_atoms, TS_class, TS_kwargs, atom_style=None):
         """Read a DATA file and try and extract x, v, box.
@@ -430,41 +432,37 @@ class DATAReader(ReaderBase):
         if has_charge:
             charges = charges[order]
 
-        attrs = []
         atm = "Atom_Base"
         mle = "Molecule_Base"
-        coord = Coordinate(coords, sid=atm)
-        attrs.append(coord)
-        species = Species(types, sid=atm)
-        attrs.append(species)
+        dbase = Database(n_atoms)
+        Coordinate(coords, sid=atm, database=dbase)
+        species = Species(types, sid=atm, database=dbase)
         if has_charge:
-            attrs.append(Charge(charges, sid=atm))
-        masses = np.zeros(n_atoms, dtype=np.float64)
+            Charge(charges, sid=atm, database=dbase)
+        masses = np.zeros(n_atoms, dtype=np.float32)
         for i, at in enumerate(types):
             masses[i] = massdict[at]
-        m = Mass(masses, sid=atm)
-        attrs.append(m)
-
-        ids = ID(atom_ids, sid=(atm,))
+        Mass(masses, sid=atm, database=dbase)
+        ids = ID(atom_ids, sid=(atm,), database=dbase)
         residx, resids = squash_by(resids)[:2]
-        ids._update_source(resids, (mle,), -1)
+        ids._update_source(resids, (mle,))
+        dbase.ix._update_source(np.arange(len(resids)), (mle,))
 
         n_residues = len(resids)
-        compomtrx = self.residx2mtrx(residx, n_residues)
-        compo = Composition(compomtrx, sid=(mle, atm))
-        attrs.append(ids)
-        attrs.append(compo)
+        compomtrx = self.residx2mtrx(residx)
+        compo = Composition(
+            compomtrx, sid=(mle, atm), database=dbase, N=n_residues, M=n_atoms
+        )
 
-        return ids, species, compo, attrs
+        return ids, species, compo, dbase
 
     @staticmethod
-    def residx2mtrx(residx, n_residues):
-        N = n_residues
+    def residx2mtrx(residx):
         M = len(residx)
         data = np.array([1 for _ in range(M)])
         row = residx
         col = np.array([_ for _ in range(M)])
-        mtrx = csr_matrix((data, (row, col)), shape=(N, M), dtype=np.float64)
+        mtrx = np.array([row, col, data])
         return mtrx
 
     def _parse_masses(self, datalines):

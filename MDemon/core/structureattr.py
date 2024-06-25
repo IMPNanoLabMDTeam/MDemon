@@ -3,12 +3,19 @@ from abc import ABCMeta, abstractmethod
 import numpy as np
 from scipy import sparse
 
-from .. import _STRUCTURE_NAMES, _STRUCTURES
+from .. import _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
 from ..lib.util import asiterable, astuple, wishnotiterable
+from .source import Source1D, Source2D
 from .structure import Atom, Bond, Molecule, Particle, Structure, Topology
 
 
-class StructureAttr(object, metaclass=ABCMeta):
+class SAttrMeta(ABCMeta):
+    def __init__(cls, name, bases, classdict):
+        ABCMeta.__init__(ABCMeta, name, bases, classdict)
+        _STRUCTURE_ATTRS.append(cls)
+
+
+class StructureAttr(object, metaclass=SAttrMeta):
     """
     Base class of structure attributes.
 
@@ -45,17 +52,17 @@ class StructureAttr(object, metaclass=ABCMeta):
         The name of :class:`StructureAttr`.
     _sid0 : `tuple`
         The default structural id of input values.
-    _dtype : `int` or `float`
-        The data type of `source`.
+    _dtype : `str`
+        Should be 'bool', 'int' or 'float'
 
     """
 
     name = "structureattr"  # name
     _sid0 = ("Structure_Base",)  # default structural base
     _tclasses = (Structure,)  # targeted classes
-    _dtype = None  # data type
+    _dtype = ""  # data type
 
-    def __init__(self, *valueslist, sid=None):
+    def __init__(self, *valueslist, sid=None, database=None, **kwargs):
         """
         We register only one structural id during the \
         initialization considering of the readability of codes. \
@@ -76,9 +83,10 @@ class StructureAttr(object, metaclass=ABCMeta):
             The structural id of input values \
             as well as the first `dict.key` in `source`.
         """
-        self.source = {}  # source
-        self.deepsource = []  # deep source
-        self._database = None  # database
+        database.register_source(self)  # source
+        database.register_deep_source(self)  # deep source
+        database.add_Attr(self)
+        self._database = database  # database
         self.timedependent = False  # time-dependent
         self.timestep = 0  # timestep
 
@@ -91,7 +99,7 @@ class StructureAttr(object, metaclass=ABCMeta):
             self._update_deepsource(valueslist, sid)
             self.source = self.deepsource[0]
         else:
-            self._update_source(valueslist[0], sid, -1)
+            self._update_source(valueslist[0], sid, **kwargs)
 
     @property
     def targeted_classes(self):
@@ -303,55 +311,57 @@ class StructureAttr1D(StructureAttr):
     name = "structureattr1D"
 
     def _update_source(self, values, sid, ix=None):
-        values = np.asarray(values, dtype=self._dtype)
-        if ix:
-            if ix != -1:
-                self.source[sid][ix] = values
-            else:
-                self.source[sid] = values
-        return {sid: values}
+        values = np.asarray(values)
+        try:
+            source = self._source_register[sid]
+            valix = np.array([ix, values])
+            source.values = valix
+        except KeyError:
+            source = Source1D(self._dtype, values)
+            self._source_register[sid] = source
 
     def _parse_source(self, sid, ix, detailed):
-        values = self.source[sid]
-        return values[ix]
+        source = self._source_register[sid]
+        return source.values[ix]
 
     def import_attrname(self, *args):
         return self.name
 
-    def import_sids(self, cls):
+    @staticmethod
+    def import_sids(cls):
         if isinstance(cls, type):
             return [(cls.import_sname(),)]
         else:
             return [(cls.sname,)]
 
 
-class Existence(StructureAttr1D):
-    name = "existence"
-    _dtype = bool
+class Absence(StructureAttr1D):
+    name = "absence"
+    _dtype = "bool"
 
 
 class Silence(StructureAttr1D):
     name = "silence"
-    _dtype = bool
+    _dtype = "bool"
 
 
 class Freeze(StructureAttr1D):
     name = "freeze"
-    _dtype = bool
+    _dtype = "bool"
 
 
 class ID(StructureAttr1D):
     name = "id"
-    _dtype = np.intp
+    _dtype = "int"
 
 
 class Index(StructureAttr1D):
     name = "ix"
-    _dtype = np.intp
+    _dtype = "int"
 
-    def __init__(self, *numlist, sid):
+    def __init__(self, *numlist, sid, database):
         valueslist = [np.arange(num) for num in numlist]
-        super().__init__(valueslist, sid=sid)
+        super().__init__(valueslist, sid=sid, database=database)
 
     def __getitem__(self, s, sid):
         return wishnotiterable(s._ix)
@@ -359,17 +369,17 @@ class Index(StructureAttr1D):
 
 class Species(StructureAttr1D):
     name = "species"
-    _dtype = np.intp
+    _dtype = "int"
 
 
 class Coordinate(StructureAttr1D):
     name = "coordinate"
-    _dtype = np.float32
+    _dtype = "float"
 
 
 class Velocity(StructureAttr1D):
     name = "velocity"
-    _dtype = np.float32
+    _dtype = "float"
 
 
 class ParticleAttr(StructureAttr1D):
@@ -380,12 +390,12 @@ class ParticleAttr(StructureAttr1D):
 
 class Mass(ParticleAttr):
     name = "mass"
-    _dtype = np.float32
+    _dtype = "float"
 
 
 class Charge(ParticleAttr):
     name = "charge"
-    _dtype = np.float32
+    _dtype = "float"
 
 
 class AtomAttr(ParticleAttr):
@@ -413,7 +423,7 @@ class BondAttr(TopologyAttr):
 
 class BondOrder(BondAttr):
     name = "bondorder"
-    _dtype = np.float32
+    _dtype = "float"
 
 
 class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
@@ -434,34 +444,33 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
         else:
             sname = cls.sname
 
-        for sid in self.source:
+        for sid in self._source_register:
             if sname == sid[0]:
                 sids.append(sid)
         return sids
 
     def _parse_source(self, sid, ix, detailed):
-        s = self.source[sid]
+        v = self._source_register[sid].values
         ix = asiterable(ix)
         values = []
         for i in ix:
-            indices = s[i].indices
+            indices = v[i].indices
             if detailed:
-                data = s[i].data
+                data = v[i].data
                 values.append(dict(zip(indices, data)))
             else:
                 values.append(indices)
-        return values
+        return wishnotiterable(values)
 
-    # TODO: Manually modify values with ix.
-    def _update_source(self, values, sid, ix):
-        values = sparse.csr_matrix(values, dtype=self._dtype)
-        if ix is not None:
-            if sid not in self.source:
-                self._init_mtrx(sid, values)
-            else:
-                self._add(sid, values)
+    def _update_source(self, values, sid, N=None, M=None):
+        # the format of values should be [row,col,data]
+        values = np.array(values)
+        try:
+            self._add(sid, values)
+        except KeyError:
+            self._init_mtrx(sid, values, N, M)
 
-    def _init_mtrx(self, sid, vlmtrx):
+    def _init_mtrx(self, sid, values, N, M):
         """
         Initiate the value matrix, then register \
         `attrname` for every single `sid`.
@@ -469,16 +478,16 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
         Parameters
         ----------
         sid : `tuple`
-        vlmtrx : `scipy.sparse.csr_matrix`
+        values : `scipy.sparse.csr_matrix`
         """
-        self.source[sid] = sparse.csr_matrix(vlmtrx.shape, dtype=self._dtype)
+        source = Source2D(self._dtype, values, N=N, M=M)
+        self._source_register[sid] = source
         self._register_attrname(sid, 0)
-        self.source[sid] += vlmtrx
-        trsp, sid1, vlmtrx1 = self._transpose(sid, vlmtrx)
+        trsp, sid1, values1 = self._transpose(sid, values)
         if trsp:
-            self.source[sid1] = sparse.csr_matrix(vlmtrx1.shape, dtype=self._dtype)
+            source1 = Source2D(self._dtype, values1, N=M, M=N)
+            self._source_register[sid1] = source1
             self._register_attrname(sid1, 1)
-            self.source[sid1] += vlmtrx1
 
     @abstractmethod
     def _register_attrname(self, **kwargs):
@@ -491,22 +500,26 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
         sid : `tuple`
         """
 
-    def _add(self, sid, vlmtrx):
-        self.source[sid] += vlmtrx
-        trsp, sid1, vlmtrx1 = self._transpose(sid, vlmtrx)
+    def _add(self, sid, values):
+        source = self._source_register[sid]
+        source.values = values
+        trsp, sid1, values1 = self._transpose(sid, values)
         if trsp:
-            self.source[sid1] += vlmtrx1
+            source1 = self._source_register[sid1]
+            source1.values = values1
 
     @staticmethod
-    def _transpose(sid, vlmtrx):
+    def _transpose(sid, values):
         sid1 = (sid[1], sid[0])
         trsp = sid1 != sid
         if trsp:
-            vlmtrx = np.transpose(vlmtrx)
-        return trsp, sid1, vlmtrx
+            values = np.array([values[1], values[0], values[2]])
+        return trsp, sid1, values
 
 
 class Connection(StructureAttr2D):
+    _dtype = "float"
+
     def _register_attrname(self, sid, x):
         self._attrnamedic[sid] = "neighbors"
 
@@ -520,9 +533,16 @@ class Composition(StructureAttr2D):
     is a wrong one.
     """
 
+    _dtype = "float"
+
     def _register_attrname(self, sid, x):
         cls = _STRUCTURE_NAMES[sid[1].split("_")[0]]
         if x == 0:
             self._attrnamedic[sid] = cls.abbreviation + "s"
         elif x == 1:
             self._attrnamedic[sid] = cls.abbreviation + "_ix"
+
+
+__all__ = []
+for attr in _STRUCTURE_ATTRS:
+    __all__.append(attr.__name__)

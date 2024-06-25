@@ -103,8 +103,10 @@ class UniverseAttrMeta(type):
 
 
 class UniverseAttr(object):
-    def __init__(self, *values):
+    def __init__(self, *values, database):
         self.values = np.array(values)
+        self._database = database
+        database.add_Attr(self)
 
     def __getitem__(self, tix):
         try:
@@ -113,8 +115,8 @@ class UniverseAttr(object):
             return self.values[0]
 
 
-class Time(UniverseAttr, metaclass=UniverseAttrMeta):
-    name = "time"
+class Timestep(UniverseAttr, metaclass=UniverseAttrMeta):
+    name = "timestep"
 
 
 class Box(UniverseAttr, metaclass=UniverseAttrMeta):

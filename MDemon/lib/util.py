@@ -131,7 +131,7 @@ def get_ext(filename):
 
 
 def wishnotiterable(obj):
-    if iterable(obj) and len(obj) == 1:
+    if iterable(obj) and len(obj) == 1 and not isinstance(obj, dict):
         obj = obj[0]
 
     return obj
