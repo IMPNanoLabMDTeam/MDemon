@@ -2,7 +2,7 @@ import MDemon as md
 
 
 def test_create_universe_from_lammpsdatafile():
-    dir_ = r"C:\Users\amphi\MDemon_DatabaseUpdate\tests\data\lammps\CNT\\"
+    dir_ = r".\tests\data\lammps\CNT\\"
     filename = r"SWNT-8-8-graphene_hole_h2o_random-66666-1-10-30-3.data"
     u = md.Universe(dir_ + filename)
     a = u.atoms[0]
@@ -16,3 +16,11 @@ def test_create_universe_from_lammpsdatafile():
     assert len(m.atms) > 0
     ag = u.angles[0]
     assert len(ag.atms) == 3
+
+    # test distance function
+    from MDemon.lib.distance import distance_array, self_distance_array
+
+    d1 = distance_array(u.atoms[0], u.atoms)
+    assert d1.shape == tuple([1, len(u.atoms)])
+    d2 = self_distance_array(u.atoms[0:4])
+    assert len(d2) == 6

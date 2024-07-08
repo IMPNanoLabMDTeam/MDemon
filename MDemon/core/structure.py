@@ -207,7 +207,7 @@ class Structure(_MutableBase):
         if item is None:
             raise TypeError("None cannot be used to index a group.")
         elif isinstance(item, numbers.Integral):
-            return self.__class__(item, self.universe)
+            return self.__class__(self.ix[item], self.universe)
         else:
             if isinstance(item, list) and item:  # check for empty list
                 # hack to make lists into numpy arrays
@@ -216,7 +216,7 @@ class Structure(_MutableBase):
             # We specify _derived_class instead of self.__class__ to allow
             # subclasses, such as UpdatingAtomGroup, to control the class
             # resulting from slicing.
-            return self.__class__(item, self.universe)
+            return self.__class__(self.ix[item], self.universe)
 
     @_check_family_consistency
     def ix2ix(self, newcls):
@@ -277,6 +277,9 @@ class Structure(_MutableBase):
         after Python 3.13?
         """
         return cls.__name__ + "_" + cls._fname
+
+    def __len__(self):
+        return len(self._ix)
 
 
 class Particle(Structure, metaclass=_ParticleMeta):

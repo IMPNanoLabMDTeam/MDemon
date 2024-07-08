@@ -52,12 +52,15 @@ if cython_linetrace:
     cpp_extra_compile_args.append("-DCYTHON_TRACE_NOGIL")
 
 
-# distances = MDExtension('MDemon.lib.c_distances',
-#                              ['MDemon/lib/c_distances' + source_suffix],
-#                              include_dirs=include_dirs + ['MDemon/lib/include'],
-#                              libraries=mathlib,
-#                              define_macros=define_macros,
-#                              extra_compile_args=extra_compile_args)
+distances = MDExtension(
+    "MDemon.lib.c_distances",
+    ["MDemon/lib/c_distances" + source_suffix],
+    include_dirs=include_dirs + ["MDemon/lib/include"],
+    libraries=mathlib,
+    define_macros=define_macros,
+    extra_compile_args=extra_compile_args,
+)
+
 source = MDExtension(
     "MDemon.core.source",
     ["MDemon/core/source" + source_suffix],
@@ -67,7 +70,7 @@ source = MDExtension(
     extra_compile_args=extra_compile_args,
 )
 
-pre_exts = [source]
+pre_exts = [distances, source]
 
 cython_generated = []
 if use_cython:
@@ -79,6 +82,7 @@ if use_cython:
             "embedsignature": False,
             "language_level": "3",
         },
+        force=True,
     )
     if cython_linetrace:
         print("Cython coverage will be enabled")

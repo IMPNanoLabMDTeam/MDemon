@@ -83,6 +83,7 @@ class StructureAttr(object, metaclass=SAttrMeta):
             The structural id of input values \
             as well as the first `dict.key` in `source`.
         """
+
         database.register_source(self)  # source
         database.register_deep_source(self)  # deep source
         database.add_Attr(self)
@@ -361,7 +362,7 @@ class Index(StructureAttr1D):
 
     def __init__(self, *numlist, sid, database):
         valueslist = [np.arange(num) for num in numlist]
-        super().__init__(valueslist, sid=sid, database=database)
+        super().__init__(*valueslist, sid=sid, database=database)
 
     def __getitem__(self, s, sid):
         return wishnotiterable(s._ix)
