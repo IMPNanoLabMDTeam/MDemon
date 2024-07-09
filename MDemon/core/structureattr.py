@@ -1,3 +1,4 @@
+import itertools
 from abc import ABCMeta, abstractmethod
 
 import numpy as np
@@ -519,6 +520,7 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
 
 
 class Connection(StructureAttr2D):
+    name = "connection"
     _dtype = "float"
 
     def _register_attrname(self, sid, x):
@@ -534,6 +536,7 @@ class Composition(StructureAttr2D):
     is a wrong one.
     """
 
+    name = "composition"
     _dtype = "float"
 
     def _register_attrname(self, sid, x):
@@ -542,6 +545,28 @@ class Composition(StructureAttr2D):
             self._attrnamedic[sid] = cls.abbreviation + "s"
         elif x == 1:
             self._attrnamedic[sid] = cls.abbreviation + "_ix"
+
+    def to_connection(self, sname):
+        sid = (
+            sname,
+            "Atom_" + sname.split("_")[-1],
+        )
+        v = self._source_register[sid].values
+
+        col = np.zeros(0, dtype=np.int32)
+        row = np.zeros(0, dtype=np.int32)
+        data = np.zeros(0, dtype=np.float32)
+        for i in range(v.shape[0]):
+            list_ = v[i].indices
+            if len(list_) > 1:
+                combinations = np.array(list(itertools.permutations(list_, 2)))
+                row_ = combinations[:, 0]
+                col_ = combinations[:, 1]
+                data_ = np.zeros(len(col_), dtype=np.float32)
+                row = np.concatenate((row, row_))
+                col = np.concatenate((col, col_))
+                data = np.concatenate((data, data_))
+        return np.array([row, col, data])
 
 
 __all__ = []

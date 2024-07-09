@@ -50,10 +50,11 @@ def _generate_from_database(dbase):
 
 
 def _database_from_file_like(*inputfiles, **kwargs):
-    file0 = inputfiles[0]
-    reader = get_reader_for(file0)
-    with reader(file0) as r:
-        database = r.parse(**kwargs)
+    for file_ in inputfiles:
+        reader = get_reader_for(file_)
+        with reader(file_) as r:
+            database = r.parse(**kwargs)
+            kwargs["Database"] = database
 
     return database
 

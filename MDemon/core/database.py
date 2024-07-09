@@ -19,8 +19,7 @@ class Database(object):
         self.set_silence = kwargs.get("set_silence", False)
         self.set_freeze = kwargs.get("set_freeze", False)
 
-        ixs = Index(n_atoms, sid=("Atom_Base",), database=self)
-        self.add_Attr(ixs)
+        Index(n_atoms, sid=("Atom_Base",), database=self)
         self._base = Family(database=self)
 
     @property

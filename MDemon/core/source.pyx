@@ -1,9 +1,7 @@
 cimport numpy as cnp
 from scipy.sparse import csr_matrix
 
-############
-# 补完代码！！！！
-# 测试速度提升！！！！
+
 cdef class Source:
     cdef object _dtype
     cdef int ndim

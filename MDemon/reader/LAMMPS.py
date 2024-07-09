@@ -1,8 +1,15 @@
 import numpy as np
-from scipy.sparse import csr_matrix
 
 from ..core.database import Database
-from ..core.structureattr import ID, Charge, Composition, Coordinate, Mass, Species
+from ..core.structureattr import (
+    ID,
+    Charge,
+    Composition,
+    Connection,
+    Coordinate,
+    Mass,
+    Species,
+)
 from ..core.universe import Box, Timestep
 from .base import DynamicReaderBase, ReaderBase, squash_by
 
@@ -173,15 +180,15 @@ class DATAReader(ReaderBase):
         if "Atoms" not in sects:
             raise ValueError("Data file was missing Atoms section")
 
-        # try:
-        ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
-        # except Exception:
-        #     errmsg = (
-        #         "Failed to parse atoms section.  You can supply a description "
-        #         "of the atom_style as a keyword argument, "
-        #         "eg mda.Universe(..., atom_style='id resid x y z')"
-        #     )
-        #     raise ValueError(errmsg) from None
+        try:
+            ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
+        except Exception:
+            errmsg = (
+                "Failed to parse atoms section.  You can supply a description "
+                "of the atom_style as a keyword argument, "
+                "eg mda.Universe(..., atom_style='id resid x y z')"
+            )
+            raise ValueError(errmsg) from None
 
         # create mapping of id to index (ie atom id 10 might be the 0th atom)
         mapping = {
@@ -206,6 +213,15 @@ class DATAReader(ReaderBase):
             species._update_source(type, sid)
             mtrx, N, M = self.bondsect2mtrx(sect, n_atoms, nentries)
             compo._update_source(mtrx, (sname, "Atom_Base"), N, M)
+            if sname == "Bond_Base":
+                mtrx_connection = compo.to_connection(sname)
+                Connection(
+                    mtrx_connection,
+                    sid=("Atom_Base", "Atom_Base"),
+                    database=dbase,
+                    N=n_atoms,
+                    M=n_atoms,
+                )
 
         Box(self._parse_box(head), database=dbase)
         return dbase
