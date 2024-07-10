@@ -1,6 +1,7 @@
 import itertools
 from abc import ABCMeta, abstractmethod
 
+import networkx as nx
 import numpy as np
 from scipy import sparse
 
@@ -230,11 +231,12 @@ class StructureAttr(object, metaclass=SAttrMeta):
         """
         sid = list(sid)
         if isinstance(s, Particle):
-            ixs = s.atm_ix
-            sid[0] = s.family.atom.sname
+            ixs = s.atms
+            sid[0] = "Atom_" + s._fname
         elif isinstance(s, Topology):
-            ixs = s.bnd_ix
-            sid[0] = s.family.bond.sname
+            ixs = s.bnds
+            sid[0] = "Bond_" + s._fname
+        sid = tuple(sid)
         return sid, ixs
 
     def __setitem__(self, s, sid, values):
@@ -318,9 +320,9 @@ class StructureAttr1D(StructureAttr):
 
     name = "structureattr1D"
 
-    def _update_source(self, values, sid, ix=None):
+    def _update_source(self, values, sid, ix=None, renew=False):
         values = np.asarray(values)
-        if sid in self._source_register:
+        if sid in self._source_register and not renew:
             source = self._source_register[sid]
             valix = [ix, values]
             source.values = valix
@@ -470,13 +472,16 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
                 values.append(indices)
         return wishnotiterable(values)
 
-    def _update_source(self, values, sid, N=None, M=None):
+    def _update_source(self, values, sid, N=None, M=None, renew=False):
         # the format of values should be [row,col,data]
         values = np.array(values)
-        try:
-            self._add(sid, values)
-        except KeyError:
+        if renew:
             self._init_mtrx(sid, values, N, M)
+        else:
+            try:
+                self._add(sid, values)
+            except KeyError:
+                self._init_mtrx(sid, values, N, M)
 
     def _init_mtrx(self, sid, values, N, M):
         """
@@ -524,6 +529,26 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
             values = np.array([values[1], values[0], values[2]])
         return trsp, sid1, values
 
+    def create_pairs(self, **kwargs):
+        sid = kwargs.get("sid", ("Atom_Base", "Atom_Base"))
+        v = self._source_register[sid].values
+
+        if sid[0] == sid[1]:
+            selfcombi = True
+        else:
+            selfcombi = False
+
+        row_indices, col_indices = v.nonzero()
+
+        if selfcombi:
+            mask = row_indices <= col_indices
+            unique_row_indices = row_indices[mask]
+            unique_col_indices = col_indices[mask]
+            unique_indices = np.vstack((unique_row_indices, unique_col_indices)).T
+            return unique_indices
+
+        return np.vstack((row_indices, col_indices)).T
+
 
 class Connection(StructureAttr2D):
     name = "connection"
@@ -531,6 +556,36 @@ class Connection(StructureAttr2D):
 
     def _register_attrname(self, sid, x):
         self._attrnamedic[sid] = "neighbors"
+
+    def to_molecules(self, fname="Base"):
+        G = nx.Graph()
+        sname = "Atom_" + fname
+        pairs = self.create_pairs(sid=(sname, sname))
+        G.add_edges_from(pairs)
+        components = list(nx.connected_components(G))
+        n_mols = len(components)
+        n_atoms = self._source_register[(sname, sname)].N
+
+        # All about molecule should be updated.
+        mol_ids = np.arange(1, n_mols + 1, dtype=np.int32)
+        mol_ixs = np.arange(n_mols, dtype=np.int32)
+        msname = "Molecule_" + fname
+        self._database.id._update_source(mol_ids, (msname,), renew=True)
+        self._database.ix._update_source(mol_ixs, (msname,), renew=True)
+
+        # uodate composition
+        row = np.zeros(n_atoms, dtype=np.int32)
+        col = np.zeros(n_atoms, dtype=np.int32)
+        data = np.zeros(n_atoms, dtype=np.float32)
+        m = 0
+        for i, atmsMol in enumerate(components):
+            n_atmsMol = len(atmsMol)
+            row[m : m + n_atmsMol] = np.full(n_atmsMol, i, dtype=np.int32)
+            col[m : m + n_atmsMol] = list(atmsMol)
+            m += n_atmsMol
+        self._database.composition._update_source(
+            np.array([row, col, data]), (msname, sname), N=n_mols, M=n_atoms, renew=True
+        )
 
 
 class Composition(StructureAttr2D):

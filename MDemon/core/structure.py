@@ -1,6 +1,8 @@
 import functools
 import numbers
 
+import matplotlib.pyplot as plt
+import networkx as nx
 import numpy as np
 
 from .. import _PARTICLES, _STRUCTURE_NAMES, _STRUCTURES, _TOPOLOGIES
@@ -58,7 +60,7 @@ class _TopologyMeta(type):
 
 
 class _StructureAttrContainer(object):
-    _SETATTR_WHITELIST = []
+    _SETATTR_WHITELIST = ["pairs"]
 
     @classmethod
     def _subclass(cls):
@@ -268,7 +270,7 @@ class Structure(_MutableBase):
         """
         Structural name of this class.
         """
-        return self.__name__ + "_" + self._fname
+        return self.__class__.__name__ + "_" + self._fname
 
     @classmethod
     def import_sname(cls):
@@ -280,6 +282,41 @@ class Structure(_MutableBase):
 
     def __len__(self):
         return len(self._ix)
+
+    def atoms2graph(self):
+        atoms = self._u.atoms
+        if "pairs" not in self.__dict__:
+            self.pairs = []
+            for i in self.atms:
+                for j in atoms[i].neighbors:
+                    if j in self.atms and i > j:
+                        self.pairs.append((i, j))
+        return self.pairs
+
+    def draw_atoms(self, style):
+        atoms = self._u.atoms
+
+        if style == "graph":
+            pairs = self.atoms2graph()
+
+            G = nx.Graph()
+            G.add_edges_from(pairs)
+
+            class_colors = {1: "red", 2: "green", 3: "blue", 4: "purple"}
+
+            num_nodes = len(G.nodes)
+            plt.figure(figsize=(min(20, num_nodes // 2), min(20, num_nodes // 2)))
+            pos = nx.spring_layout(G, k=np.sqrt(1 / num_nodes))
+
+            node_colors = [class_colors[atoms[node].species] for node in G.nodes]
+
+            nx.draw_networkx_nodes(
+                G, pos, node_color=node_colors, node_size=500, alpha=0.8
+            )
+            nx.draw_networkx_edges(G, pos, alpha=0.5)
+            nx.draw_networkx_labels(G, pos)
+
+            plt.title(f"{self.sname} {self.ix}")
 
 
 class Particle(Structure, metaclass=_ParticleMeta):

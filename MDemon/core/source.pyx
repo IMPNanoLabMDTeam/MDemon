@@ -55,13 +55,13 @@ cdef class Source2D(Source):
     cdef cnp.ndarray col
     cdef cnp.ndarray data
     cdef object _values
-    cdef int N
-    cdef int M
+    cdef int _N
+    cdef int _M
 
     def __cinit__(self, str dtype, cnp.ndarray values, **kwargs):
         
-        self.N = kwargs.get('N', 0)
-        self.M = kwargs.get('M', 0)
+        self._N = kwargs.get('N', 0)
+        self._M = kwargs.get('M', 0)
 
         self.tmp1[0] = self.dim[1]
 
@@ -76,7 +76,7 @@ cdef class Source2D(Source):
 
 
     def __init__(self, str dtype, cnp.ndarray values, **kwargs):
-        self._values = csr_matrix((self.data, (self.row, self.col)), shape=(self.N, self.M))
+        self._values = csr_matrix((self.data, (self.row, self.col)), shape=(self._N, self._M))
 
 
     @property
@@ -88,3 +88,11 @@ cdef class Source2D(Source):
         val = csr_matrix((valmn[2], (valmn[0], valmn[1])), 
                             shape=(self.N, self.M))
         self._values += val
+
+    @property
+    def N(self):
+        return self._N
+
+    @property
+    def M(self):
+        raise self._M

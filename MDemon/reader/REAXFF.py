@@ -142,4 +142,5 @@ class REAXFFReader(ReaderBase):
 
         dbase.id._update_source(bond_ids, ("Bond_Base",))
         dbase.ix._update_source(np.arange(n_bonds, dtype=np.int32), ("Bond_Base",))
+        dbase.connection.to_molecules()
         return dbase
