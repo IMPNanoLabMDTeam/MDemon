@@ -15,7 +15,7 @@ cdef class Source:
         elif dtype == 'float':
             self._dtype = cnp.NPY_FLOAT32
         elif dtype == 'int':
-            self._dtype = cnp.NPY_INTP
+            self._dtype = cnp.NPY_INT32
         self.dim = values.shape
         self.ndim = values.ndim
 
@@ -42,7 +42,7 @@ cdef class Source1D(Source):
 
     @values.setter
     def values(self,valix):
-        cdef cnp.ndarray[cnp.npy_intp, ndim=1] ix = valix[0]
+        cdef cnp.ndarray[cnp.npy_int32, ndim=1] ix = valix[0]
         cdef cnp.ndarray values
         cdef cnp.npy_intp dim[1]
         dim[0] = valix[1].shape[0]
@@ -65,10 +65,10 @@ cdef class Source2D(Source):
 
         self.tmp1[0] = self.dim[1]
 
-        self.row =  cnp.PyArray_EMPTY(1, self.tmp1, cnp.NPY_INTP, 0)
+        self.row =  cnp.PyArray_EMPTY(1, self.tmp1, cnp.NPY_INT32, 0)
         cnp.PyArray_CopyInto(self.row, values[0])
         
-        self.col =  cnp.PyArray_EMPTY(1, self.tmp1, cnp.NPY_INTP, 0)
+        self.col =  cnp.PyArray_EMPTY(1, self.tmp1, cnp.NPY_INT32, 0)
         cnp.PyArray_CopyInto(self.col, values[1])       
 
         self.data =  cnp.PyArray_EMPTY(1, self.tmp1, self._dtype, 0)

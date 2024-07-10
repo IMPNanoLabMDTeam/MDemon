@@ -303,6 +303,12 @@ class StructureAttr(object, metaclass=SAttrMeta):
             snames.extend(list(sid))
         return tuple(set(snames))
 
+    @classmethod
+    def _subclass(cls, **kwargs):
+        newcls = type(cls.__name__, (cls,), kwargs)
+
+        return newcls
+
 
 class StructureAttr1D(StructureAttr):
     """
@@ -314,11 +320,11 @@ class StructureAttr1D(StructureAttr):
 
     def _update_source(self, values, sid, ix=None):
         values = np.asarray(values)
-        try:
+        if sid in self._source_register:
             source = self._source_register[sid]
-            valix = np.array([ix, values])
+            valix = [ix, values]
             source.values = valix
-        except KeyError:
+        else:
             source = Source1D(self._dtype, values)
             self._source_register[sid] = source
 
@@ -521,7 +527,7 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
 
 class Connection(StructureAttr2D):
     name = "connection"
-    _dtype = "float"
+    _dtype = "int"
 
     def _register_attrname(self, sid, x):
         self._attrnamedic[sid] = "neighbors"
@@ -553,16 +559,16 @@ class Composition(StructureAttr2D):
         )
         v = self._source_register[sid].values
 
-        col = np.zeros(0, dtype=np.int32)
         row = np.zeros(0, dtype=np.int32)
-        data = np.zeros(0, dtype=np.float32)
+        col = np.zeros(0, dtype=np.int32)
+        data = np.zeros(0, dtype=np.int32)
         for i in range(v.shape[0]):
             list_ = v[i].indices
             if len(list_) > 1:
                 combinations = np.array(list(itertools.permutations(list_, 2)))
                 row_ = combinations[:, 0]
                 col_ = combinations[:, 1]
-                data_ = np.zeros(len(col_), dtype=np.float32)
+                data_ = np.full(len(row_), i, dtype=np.int32)
                 row = np.concatenate((row, row_))
                 col = np.concatenate((col, col_))
                 data = np.concatenate((data, data_))

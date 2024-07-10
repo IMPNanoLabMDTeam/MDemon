@@ -205,24 +205,23 @@ class DATAReader(ReaderBase):
         ]:
             try:
                 id_, type, sect = self._parse_bond_section(sects[L], nentries, mapping)
+                sid = (sname,)
+                ids._update_source(id_, sid)
+                dbase.ix._update_source(np.arange(len(id_)), (sname,))
+                species._update_source(type, sid)
+                mtrx, N, M = self.bondsect2mtrx(sect, n_atoms, nentries)
+                compo._update_source(mtrx, (sname, "Atom_Base"), N, M)
+                if sname == "Bond_Base":
+                    mtrx_connection = compo.to_connection(sname)
+                    Connection(
+                        mtrx_connection,
+                        sid=("Atom_Base", "Atom_Base"),
+                        database=dbase,
+                        N=n_atoms,
+                        M=n_atoms,
+                    )
             except KeyError:
                 id_, type, sect = [], [], []
-            sid = (sname,)
-            ids._update_source(id_, sid)
-            dbase.ix._update_source(np.arange(len(id_)), (sname,))
-            species._update_source(type, sid)
-            mtrx, N, M = self.bondsect2mtrx(sect, n_atoms, nentries)
-            compo._update_source(mtrx, (sname, "Atom_Base"), N, M)
-            if sname == "Bond_Base":
-                mtrx_connection = compo.to_connection(sname)
-                Connection(
-                    mtrx_connection,
-                    sid=("Atom_Base", "Atom_Base"),
-                    database=dbase,
-                    N=n_atoms,
-                    M=n_atoms,
-                )
-
         Box(self._parse_box(head), database=dbase)
         return dbase
 

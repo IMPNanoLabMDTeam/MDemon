@@ -54,7 +54,7 @@ def _database_from_file_like(*inputfiles, **kwargs):
         reader = get_reader_for(file_)
         with reader(file_) as r:
             database = r.parse(**kwargs)
-            kwargs["Database"] = database
+            kwargs["database"] = database
 
     return database
 

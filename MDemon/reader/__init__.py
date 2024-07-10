@@ -1,4 +1,4 @@
 __all__ = ["LAMMPS"]
 
 
-from . import LAMMPS
+from . import LAMMPS, REAXFF

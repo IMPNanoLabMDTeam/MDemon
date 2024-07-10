@@ -24,3 +24,15 @@ def test_create_universe_from_lammpsdatafile():
     assert d1.shape == tuple([1, len(u.atoms)])
     d2 = self_distance_array(u.atoms[0:4])
     assert len(d2) == 6
+
+
+def test_create_universe_from_LammpsReaxff():
+    dir_ = r".\tests\data\lammps\IrradiatedKapton\\"
+    modelpri = r"KAPTON5_504-33r_irradiated"
+    datafile = dir_ + modelpri + ".data"
+    bondfile = dir_ + modelpri + ".reaxff"
+
+    u = md.Universe(datafile, bondfile)
+    b1_ix = min(u.atoms[0].bnd_ix)
+    a1_ix = min(u.bonds[b1_ix].atms)
+    assert a1_ix == 0
