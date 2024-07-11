@@ -6,9 +6,19 @@ import numpy as np
 from scipy import sparse
 
 from .. import _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
-from ..lib.util import asiterable, astuple, wishnotiterable
+from ..lib.util import asiterable, astuple, flat, wishnotiterable
 from .source import Source1D, Source2D
 from .structure import Atom, Bond, Molecule, Particle, Structure, Topology
+
+
+def sum_output(func):
+    def wrapper(*args, **kwargs):
+        original_output = func(*args, **kwargs)
+        modified_output = sum(flat(original_output))
+
+        return modified_output
+
+    return wrapper
 
 
 class SAttrMeta(ABCMeta):
@@ -402,6 +412,10 @@ class Mass(ParticleAttr):
     name = "mass"
     _dtype = "float"
 
+    @sum_output
+    def __getitem__(self, s, sid):
+        return super().__getitem__(s, sid)
+
 
 class Charge(ParticleAttr):
     name = "charge"
@@ -470,11 +484,11 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
                 values.append(dict(zip(indices, data)))
             else:
                 values.append(indices)
+
         return wishnotiterable(values)
 
     def _update_source(self, values, sid, N=None, M=None, renew=False):
         # the format of values should be [row,col,data]
-        values = np.array(values)
         if renew:
             self._init_mtrx(sid, values, N, M)
         else:
@@ -628,6 +642,25 @@ class Composition(StructureAttr2D):
                 col = np.concatenate((col, col_))
                 data = np.concatenate((data, data_))
         return np.array([row, col, data])
+
+    def _update_source(
+        self, values, sid, N=None, M=None, renew=False, simplemode=False
+    ):
+        if simplemode:
+            # values = [[],[],...,[]]
+            n_temp = len(flat(values))
+            row = np.zeros(n_temp, dtype=np.int32)
+            col = np.zeros(n_temp, dtype=np.int32)
+            data = np.zeros(n_temp, dtype=np.float32)
+            k = 0
+            for i, ixs in enumerate(values):
+                n_ix = len(ixs)
+                row[k : k + n_ix] = np.full(n_ix, i, dtype=np.int32)
+                col[k : k + n_ix] = ixs
+                k += n_ix
+            values = np.array([row, col, data])
+
+        return super()._update_source(values, sid, N, M, renew)
 
 
 __all__ = []

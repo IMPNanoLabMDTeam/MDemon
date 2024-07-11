@@ -411,3 +411,17 @@ def check_box(box):
     if np.all(box[3:] == 90.0):
         return "ortho", box[:3]
     return "tri_vecs", triclinic_vectors(box)
+
+
+def flat(nums):
+    """
+    Flat the multi-layer nesting list.
+    """
+    res = []
+    nums = asiterable(nums)
+    for i in nums:
+        if isinstance(i, list):
+            res.extend(flat(i))
+        else:
+            res.append(i)
+    return res

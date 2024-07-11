@@ -66,7 +66,6 @@ class Universe(object):
         self._class_bases = _make_bases()
         self._database = _database_from_file_like(*inputfiles)
         self._database._u = self
-        self.families = {"Base": self._database.base}
 
         _generate_from_database(self._database)
 
@@ -95,6 +94,14 @@ class Universe(object):
             return attr.__setitem__(self.timestep, values)
 
         setattr(cls, attr.name, property(getter, setter, None, None))
+
+    @property
+    def universe(self):
+        return self
+
+    @property
+    def families(self):
+        return self._database.families
 
 
 class UniverseAttrMeta(type):

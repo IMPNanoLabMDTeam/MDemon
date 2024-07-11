@@ -1,3 +1,5 @@
+import numpy as np
+
 import MDemon as md
 
 
@@ -36,3 +38,8 @@ def test_create_universe_from_LammpsReaxff():
     b1_ix = min(u.atoms[0].bnd_ix)
     a1_ix = min(u.bonds[b1_ix].atms)
     assert a1_ix == 0
+
+    mol = u.molecules[10]
+    assert type(mol.mass) is np.float32
+    mol.create_rings(multiring=False)
+    mol.draw_atoms("graph")

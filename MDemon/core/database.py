@@ -1,6 +1,6 @@
 import numpy as np
 
-from .. import _STRUCTURES
+from .. import _STRUCTURES, _UNIVERSE_ATTRS
 from .structureattr import Absence, Freeze, Index, Silence
 
 
@@ -21,6 +21,7 @@ class Database(object):
 
         Index(n_atoms, sid=("Atom_Base",), database=self)
         self._base = Family(database=self)
+        self._families = {"Base": self._base}
 
     @property
     def time_dependent(self):
@@ -105,6 +106,10 @@ class Database(object):
     def base(self):
         return self._base
 
+    @property
+    def families(self):
+        return self._families
+
     def register_source(self, attr):
         self._source_register[attr.name] = {}
         attr._source_register = self._source_register[attr.name]
@@ -113,6 +118,31 @@ class Database(object):
         if self.time_dependent:
             self._deep_source_register[attr.name] = {}
             attr._deep_source_register = self._deep_source_register[attr.name]
+
+    def register(self, sname, register_dic):
+        fname = sname.split("_")[-1]
+        f = self.families[fname]
+        ix_registered = False
+        for sname1, compolist in register_dic.items():
+            if not ix_registered:
+                ixs = np.arange(len(compolist))
+                self.ix._update_source(ixs, (sname,), renew=True)
+                ix_registered = True
+
+            n1 = len(self.ix._source_register[(sname1,)].values)
+            self.composition._update_source(
+                compolist,
+                (sname, sname1),
+                N=len(ixs),
+                M=n1,
+                renew=True,
+                simplemode=True,
+            )
+
+        for attr in self.attrs:
+            if attr.__class__ not in _UNIVERSE_ATTRS:
+                f._process_attr(attr)
+        f.instancing()
 
 
 class Family(object):
