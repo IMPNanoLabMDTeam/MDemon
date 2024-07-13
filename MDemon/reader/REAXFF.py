@@ -23,7 +23,7 @@ def fconnect2bonds(fconnect):
                 data_connec = np.concatenate((data_connec, [nbd, nbd]))
                 nbd += 1
 
-    data = np.zeros(len(col), dtype=np.float32)
+    data = np.ones(len(col), dtype=np.float32)
     dbase = fconnect._database
     Composition(np.array([row, col, data]), sid=("Bond_Base", "Atom_Base"), N=nbd, M=N)
 
@@ -91,7 +91,7 @@ class REAXFFReader(ReaderBase):
         bos = np.zeros(n_bonds, dtype=np.int32)
         row = np.zeros(2 * n_bonds, dtype=np.int32)
         col = np.zeros(2 * n_bonds, dtype=np.int32)
-        data = np.zeros(2 * n_bonds, dtype=np.int32)
+        data = np.ones(2 * n_bonds, dtype=np.int32)
         col_b = np.zeros(2 * n_bonds, dtype=np.int32)
         m = 0
         n = 0
@@ -130,6 +130,7 @@ class REAXFFReader(ReaderBase):
             ("Bond_Base", "Atom_Base"),
             N=n_bonds,
             M=n_atoms,
+            reverse=True,
         )
 
         Connection(
@@ -142,5 +143,5 @@ class REAXFFReader(ReaderBase):
 
         dbase.id._update_source(bond_ids, ("Bond_Base",))
         dbase.ix._update_source(np.arange(n_bonds, dtype=np.int32), ("Bond_Base",))
-        dbase.connection.to_molecules()
+        dbase.connection.union("Atom_Base", "Molecule_Base", process_attr=False)
         return dbase

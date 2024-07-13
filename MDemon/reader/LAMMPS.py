@@ -196,7 +196,7 @@ class DATAReader(ReaderBase):
             for i, atom_id in enumerate(ids._source_register[("Atom_Base",)].values)
         }
         n_atoms = len(mapping)
-
+        sname_atm = "Atom_Base"
         for sname, L, nentries in [
             ("Bond_Base", "Bonds", 2),
             ("Angle_Base", "Angles", 3),
@@ -210,16 +210,12 @@ class DATAReader(ReaderBase):
                 dbase.ix._update_source(np.arange(len(id_)), (sname,))
                 species._update_source(type, sid)
                 mtrx, N, M = self.bondsect2mtrx(sect, n_atoms, nentries)
-                compo._update_source(mtrx, (sname, "Atom_Base"), N, M)
+
                 if sname == "Bond_Base":
-                    mtrx_connection = compo.to_connection(sname)
-                    Connection(
-                        mtrx_connection,
-                        sid=("Atom_Base", "Atom_Base"),
-                        database=dbase,
-                        N=n_atoms,
-                        M=n_atoms,
-                    )
+                    compo._update_source(mtrx, (sname, sname_atm), N, M, reverse=True)
+                    compo.to_connection(sname_atm, process_attr=False)
+                else:
+                    compo._update_source(mtrx, (sname, sname_atm), N, M)
             except KeyError:
                 id_, type, sect = [], [], []
         Box(self._parse_box(head), database=dbase)

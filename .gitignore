@@ -6,6 +6,8 @@
 *.so
 *.egg
 *.profraw
+*.html
+*.c
 # ignore coverage files
 .coverage*
 !.coveragerc

@@ -9,9 +9,9 @@ def test_create_universe_from_lammpsdatafile():
     u = md.Universe(dir_ + filename)
     a = u.atoms[0]
     assert len(a.coordinate) == 3
-    assert list(a.mle_ix.keys())[0] >= 0
+    assert list(a.mle_top.keys())[0] >= 0
     a.detailed = False
-    assert a.mle_ix >= 0
+    assert a.mle_top >= 0
     box = u.box
     assert len(box) == 6
     m = u.molecules[0]
@@ -35,11 +35,12 @@ def test_create_universe_from_LammpsReaxff():
     bondfile = dir_ + modelpri + ".reaxff"
 
     u = md.Universe(datafile, bondfile)
-    b1_ix = min(u.atoms[0].bnd_ix)
-    a1_ix = min(u.bonds[b1_ix].atms)
+    b1_ix = min(u.atoms[0].bnds)
+    a1_ix = min(u.bonds[b1_ix].atm_top)
     assert a1_ix == 0
 
     mol = u.molecules[10]
     assert type(mol.mass) is np.float32
-    mol.create_rings(multiring=False)
-    mol.draw_atoms("graph")
+    mol.create_rings(multiring=True)
+    assert u.rings[0].atms
+    assert u.multirings[0].rngs and u.multirings[0].atms

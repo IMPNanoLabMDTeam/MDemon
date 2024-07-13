@@ -1,6 +1,6 @@
 [run]
 source = MDemon
-
+omit = */c_distances.pyx
 [report]
 exclude_lines =
     # Have to re-enable the standard pragma

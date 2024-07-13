@@ -420,6 +420,9 @@ def flat(nums):
     res = []
     nums = asiterable(nums)
     for i in nums:
+        if isinstance(i, dict):
+            i = list(i.keys())
+
         if isinstance(i, list):
             res.extend(flat(i))
         else:

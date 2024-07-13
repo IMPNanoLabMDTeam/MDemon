@@ -11,6 +11,7 @@ class Database(object):
         self._source_register = {}
         self._deep_source_register = {}
         self.attrs = []
+        self.attrnames = []
 
         self._n_atoms = n_atoms
 
@@ -95,6 +96,7 @@ class Database(object):
 
         """
         self.attrs.append(attr)
+        self.attrnames.append(attr.name)
         attr._database = self
         self.__setattr__(attr.name, attr)
 
@@ -111,15 +113,21 @@ class Database(object):
         return self._families
 
     def register_source(self, attr):
-        self._source_register[attr.name] = {}
-        attr._source_register = self._source_register[attr.name]
+        try:
+            attr._source_register = self._source_register[attr.name]
+        except KeyError:
+            self._source_register[attr.name] = {}
+            attr._source_register = self._source_register[attr.name]
 
     def register_deep_source(self, attr):
         if self.time_dependent:
-            self._deep_source_register[attr.name] = {}
-            attr._deep_source_register = self._deep_source_register[attr.name]
+            try:
+                attr._deep_source_register = self._deep_source_register[attr.name]
+            except KeyError:
+                self._deep_source_register[attr.name] = {}
+                attr._deep_source_register = self._deep_source_register[attr.name]
 
-    def register(self, sname, register_dic):
+    def register_structure(self, sname, register_dic):
         fname = sname.split("_")[-1]
         f = self.families[fname]
         ix_registered = False

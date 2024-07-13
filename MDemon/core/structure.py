@@ -294,24 +294,25 @@ class Structure(_MutableBase):
     def atoms2graph(self):
         if "atom_graph" not in self.__dict__:
             atoms = self._u.atoms
+
             mtrx_connect = self.atom_connection()
 
             if isinstance(self, Atom):
                 atm_list = self.ix
             else:
                 atm_list = flat(self.atms)
-
+            atm_set = set(atm_list)
             pairs = []
             for i in atm_list:
                 for j in atoms[i].neighbors:
-                    if j in atm_list and i > j:
+                    if j in atm_set and i > j:
                         pairs.append((i, j, {"label": mtrx_connect[i, j]}))
 
             G = nx.Graph()
             G.add_edges_from(pairs)
             self.atom_graph = G
 
-    def draw_atoms(self, style):
+    def draw_atoms(self, style, k=1):
         atoms = self._u.atoms
 
         if style == "graph":
@@ -322,118 +323,62 @@ class Structure(_MutableBase):
 
             num_nodes = len(G.nodes)
             plt.figure(figsize=(num_nodes // 10, num_nodes // 10), dpi=300)
-            pos = nx.spring_layout(G, k=np.sqrt(2 / num_nodes))
+            pos = nx.spring_layout(G, k=k * np.sqrt(1 / num_nodes))
 
             node_colors = [class_colors[atoms[node].species] for node in G.nodes]
 
             nx.draw_networkx_nodes(
-                G, pos, node_color=node_colors, node_size=500, alpha=0.8
+                G, pos, node_color=node_colors, node_size=250, alpha=0.8
             )
             nx.draw_networkx_edges(G, pos, alpha=0.5)
-            nx.draw_networkx_labels(G, pos)
+            nx.draw_networkx_labels(G, pos, font_size=10)
 
             edge_labels = nx.get_edge_attributes(G, "label")
             nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=5)
 
             plt.title(f"{self.sname} {self.ix}")
 
-    def create_rings(self, renew=True, multiring=False):
+    def create_rings(self, multiring=False):
+        """
+        Create rings from an atom graph.
+        """
         self.atoms2graph()
 
         cycles = list(nx.cycle_basis(self.atom_graph))
         sname = "Ring_" + self._fname
-
-        def find_large_cycles(cycles):
-            """
-            将共享同一条边的回路归为一个大回路集合
-            """
-            cyc2ix = {}
-            for i, cyc in enumerate(cycles):
-                cyc = tuple(cyc)
-                cyc2ix[cyc] = i
-
-            edge_to_cycles = defaultdict(set)
-
-            # 建立 edge_to_cycles 字典，记录每条边对应的回路列表
-            for cycle in cycles:
-                num_nodes = len(cycle)
-                for i in range(num_nodes):
-                    edge = frozenset((cycle[i], cycle[(i + 1) % num_nodes]))
-                    edge_to_cycles[edge].add(tuple(cycle))  # 将回路转换为元组
-
-            large_cycles = []
-            large_cycles2cycles = []
-            visited_cycles = set()
-
-            def bfs(start_cycle, large_cycle_id):
-                # 使用 BFS 找到所有与 start_cycle 相邻的回路，构建一个大回路
-                queue = deque([start_cycle])
-                visited = set([tuple(start_cycle)])  # 将起始回路转换为元组形式
-                ii = 0
-                while queue:
-                    if large_cycle_id == 41 and ii % 10 == 0:
-                        print(len(queue), "\n", ii)
-                    ii += 1
-                    current_cycle = queue.popleft()
-                    large_cycles[large_cycle_id].append(
-                        list(current_cycle)
-                    )  # 将当前回路转换回列表形式
-                    large_cycles2cycles[large_cycle_id].append(
-                        cyc2ix[tuple(current_cycle)]
-                    )
-                    for node in current_cycle:
-                        for neighbor_cycle in edge_to_cycles[
-                            frozenset(
-                                (
-                                    node,
-                                    current_cycle[
-                                        (current_cycle.index(node) + 1)
-                                        % len(current_cycle)
-                                    ],
-                                )
-                            )
-                        ]:
-                            if tuple(neighbor_cycle) not in visited:
-                                visited.add(tuple(neighbor_cycle))
-                                queue.append(neighbor_cycle)
-
-                large_cycles[large_cycle_id] = list(
-                    set(flat(large_cycles[large_cycle_id]))
-                )
-
-                return visited
-
-            # 遍历所有回路，构建大回路集合
-            large_cycle_id = 0
-            for cycle in cycles:
-                if tuple(cycle) not in visited_cycles:
-                    # 创建新的大回路
-                    large_cycles.append([])
-                    large_cycles2cycles.append([])
-                    visited = bfs(cycle, large_cycle_id)
-                    visited_cycles = visited_cycles.union(visited)
-                    # print(f"Multiring {large_cycle_id} constructing finished!")
-                    large_cycle_id += 1
-                    # print(f"{len(cycles)-len(visited_cycles)} rings left.")
-
-            return large_cycles, large_cycles2cycles
-
         sname_atm = "Atom_" + self._fname
+        sname_bnd = "Bond_" + self._fname
+
+        # 获取每个回路的边的 label 属性
+        def get_cycle_edge_labels(G, cycles):
+            cycle_edge_labels = []
+            for cycle in cycles:
+                labels = []
+                for i in range(len(cycle)):
+                    u = cycle[i]
+                    v = cycle[(i + 1) % len(cycle)]
+
+                    labels.append(G[u][v]["label"])
+                cycle_edge_labels.append(labels)
+            return cycle_edge_labels
+
+        # 获取回路的边的 label 属性, which is ix of bonds.
+        cycle_edge_labels = get_cycle_edge_labels(self.atom_graph, cycles)
+
+        self._u._database.register_structure(
+            sname, {sname_atm: cycles, sname_bnd: cycle_edge_labels}
+        )
+
+        self._u._database.composition.to_connection(sname)
+
         if multiring:
-            large_cycles, large_cycles2cycles = find_large_cycles(cycles)
-            sname_mrng = "Multiring_" + self._fname
-            if renew:
-                self._u._database.register(sname, {sname_atm: cycles})
-                self._u._database.register(
-                    sname_mrng, {sname_atm: large_cycles, sname: large_cycles2cycles}
-                )
-            else:
-                return cycles, large_cycles
-        else:
-            if renew:
-                self._u._database.register(sname, {sname_atm: cycles})
-            else:
-                return cycles
+            self._u._database.connection.union(
+                "Ring_Base", "Multiring_Base", process_attr=True
+            )
+
+    @property
+    def n_atoms(self):
+        return len(self.atms)
 
 
 class Particle(Structure, metaclass=_ParticleMeta):
@@ -518,3 +463,7 @@ class Ring(Topology):
 
 class Multiring(Topology):
     abbreviation = "mrng"
+
+    @property
+    def n_rings(self):
+        return len(self.rngs)

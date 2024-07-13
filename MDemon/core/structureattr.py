@@ -6,7 +6,7 @@ import numpy as np
 from scipy import sparse
 
 from .. import _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
-from ..lib.util import asiterable, astuple, flat, wishnotiterable
+from ..lib.util import asiterable, astuple, flat, iterable, wishnotiterable
 from .source import Source1D, Source2D
 from .structure import Atom, Bond, Molecule, Particle, Structure, Topology
 
@@ -321,6 +321,20 @@ class StructureAttr(object, metaclass=SAttrMeta):
 
         return newcls
 
+    @classmethod
+    def auto_instancing(
+        cls, *valueslist, sid=None, database=None, process_attr=True, **kwargs
+    ):
+        fname = kwargs.pop("fname", "Base")
+        if cls.name in database.attrnames:
+            attr = database.__getattribute__(cls.name)
+            attr._update_source(valueslist[0], sid=sid, renew=True, **kwargs)
+        else:
+            attr = cls(*valueslist, sid=sid, database=database, **kwargs)
+        if process_attr:
+            database.families[fname]._process_attr(attr)
+        return attr
+
 
 class StructureAttr1D(StructureAttr):
     """
@@ -380,11 +394,23 @@ class Index(StructureAttr1D):
     _dtype = "int"
 
     def __init__(self, *numlist, sid, database):
-        valueslist = [np.arange(num) for num in numlist]
+        if not iterable(numlist[0]):
+            valueslist = [np.arange(num) for num in numlist]
         super().__init__(*valueslist, sid=sid, database=database)
 
     def __getitem__(self, s, sid):
         return wishnotiterable(s._ix)
+
+    @classmethod
+    def auto_instancing(
+        cls, *valueslist, sid=None, database=None, process_attr=True, **kwargs
+    ):
+        super().auto_instancing(
+            *valueslist, sid=sid, database=database, process_attr=process_attr, **kwargs
+        )
+        if process_attr:
+            fname = sid[0].split("_")[-1]
+            database.families[fname].instancing()
 
 
 class Species(StructureAttr1D):
@@ -487,8 +513,11 @@ class StructureAttr2D(StructureAttr, metaclass=ABCMeta):
 
         return wishnotiterable(values)
 
-    def _update_source(self, values, sid, N=None, M=None, renew=False):
+    def _update_source(self, values, sid, N=None, M=None, renew=False, reverse=False):
         # the format of values should be [row,col,data]
+        if reverse:
+            trsp, sid, values = self._transpose(sid, values)
+            N, M = M, N
         if renew:
             self._init_mtrx(sid, values, N, M)
         else:
@@ -571,35 +600,52 @@ class Connection(StructureAttr2D):
     def _register_attrname(self, sid, x):
         self._attrnamedic[sid] = "neighbors"
 
-    def to_molecules(self, fname="Base"):
+    def union(self, sname0, sname1, process_attr=True):
+        """
+        atoms and mols are just metaphors.
+        """
         G = nx.Graph()
-        sname = "Atom_" + fname
-        pairs = self.create_pairs(sid=(sname, sname))
+        fname = sname0.split("_")[-1]
+        pairs = self.create_pairs(sid=(sname0, sname0))
         G.add_edges_from(pairs)
         components = list(nx.connected_components(G))
+
         n_mols = len(components)
-        n_atoms = self._source_register[(sname, sname)].N
+        n_atoms = self._source_register[(sname0, sname0)].N
 
         # All about molecule should be updated.
-        mol_ids = np.arange(1, n_mols + 1, dtype=np.int32)
-        mol_ixs = np.arange(n_mols, dtype=np.int32)
-        msname = "Molecule_" + fname
-        self._database.id._update_source(mol_ids, (msname,), renew=True)
-        self._database.ix._update_source(mol_ixs, (msname,), renew=True)
-
-        # uodate composition
+        ixs_mol = np.arange(n_mols, dtype=np.int32)
+        Index.auto_instancing(
+            ixs_mol,
+            sid=(sname1,),
+            database=self._database,
+            fname=fname,
+            process_attr=process_attr,
+        )
+        # update composition
         row = np.zeros(n_atoms, dtype=np.int32)
         col = np.zeros(n_atoms, dtype=np.int32)
-        data = np.zeros(n_atoms, dtype=np.float32)
+        data = np.ones(n_atoms, dtype=np.float32)
         m = 0
         for i, atmsMol in enumerate(components):
             n_atmsMol = len(atmsMol)
             row[m : m + n_atmsMol] = np.full(n_atmsMol, i, dtype=np.int32)
             col[m : m + n_atmsMol] = list(atmsMol)
             m += n_atmsMol
-        self._database.composition._update_source(
-            np.array([row, col, data]), (msname, sname), N=n_mols, M=n_atoms, renew=True
+
+        compo = Composition.auto_instancing(
+            np.array([row, col, data]),
+            sid=(sname1, sname0),
+            database=self._database,
+            N=n_mols,
+            M=n_atoms,
+            fname=fname,
+            process_attr=process_attr,
         )
+        if sname0.split("_")[0] != "Atom":
+            compo.big_middle_small(
+                sname0=sname1, sname1=sname0, sname2="Atom_" + sname0.split("_")[-1]
+            )
 
 
 class Composition(StructureAttr2D):
@@ -619,39 +665,55 @@ class Composition(StructureAttr2D):
         if x == 0:
             self._attrnamedic[sid] = cls.abbreviation + "s"
         elif x == 1:
-            self._attrnamedic[sid] = cls.abbreviation + "_ix"
+            self._attrnamedic[sid] = cls.abbreviation + "_top"
 
-    def to_connection(self, sname):
-        sid = (
-            sname,
-            "Atom_" + sname.split("_")[-1],
-        )
+    def to_connection(self, sname, process_attr=True):
+        """
+        The default definition of connection is
+        sharing the same bond.
+        """
+        sid = ("Bond_" + sname.split("_")[-1], sname)
         v = self._source_register[sid].values
 
-        row = np.zeros(0, dtype=np.int32)
-        col = np.zeros(0, dtype=np.int32)
-        data = np.zeros(0, dtype=np.int32)
-        for i in range(v.shape[0]):
-            list_ = v[i].indices
-            if len(list_) > 1:
-                combinations = np.array(list(itertools.permutations(list_, 2)))
-                row_ = combinations[:, 0]
-                col_ = combinations[:, 1]
-                data_ = np.full(len(row_), i, dtype=np.int32)
-                row = np.concatenate((row, row_))
-                col = np.concatenate((col, col_))
-                data = np.concatenate((data, data_))
-        return np.array([row, col, data])
+        # 获取CSR矩阵的行索引和列索引
+        rows, cols = v.nonzero()
+
+        # 使用一个字典来收集每一行的非零列索引
+        row_dict = {}
+        for r, c in zip(rows, cols):
+            if r not in row_dict:
+                row_dict[r] = []
+            row_dict[r].append(c)
+
+        # 收集所有可能的连接对
+        connections = []
+        for indices in row_dict.values():
+            if len(indices) > 1:
+                connections.extend(list(itertools.permutations(indices, 2)))
+
+        connections = np.array(list(set(connections)))
+        row = connections[:, 0]
+        col = connections[:, 1]
+        data = np.ones(len(connections), dtype=np.int32)
+        Connection.auto_instancing(
+            np.array([row, col, data]),
+            sid=(sname, sname),
+            database=self._database,
+            N=v.shape[1],
+            M=v.shape[1],
+            fname=sname.split("_")[-1],
+            process_attr=process_attr,
+        )
 
     def _update_source(
-        self, values, sid, N=None, M=None, renew=False, simplemode=False
+        self, values, sid, N=None, M=None, renew=False, reverse=False, simplemode=False
     ):
         if simplemode:
             # values = [[],[],...,[]]
             n_temp = len(flat(values))
             row = np.zeros(n_temp, dtype=np.int32)
             col = np.zeros(n_temp, dtype=np.int32)
-            data = np.zeros(n_temp, dtype=np.float32)
+            data = np.ones(n_temp, dtype=np.float32)
             k = 0
             for i, ixs in enumerate(values):
                 n_ix = len(ixs)
@@ -660,7 +722,36 @@ class Composition(StructureAttr2D):
                 k += n_ix
             values = np.array([row, col, data])
 
-        return super()._update_source(values, sid, N, M, renew)
+        return super()._update_source(values, sid, N, M, renew, reverse)
+
+    def big_middle_small(self, sname0, sname1, sname2):
+        v0 = self._source_register[(sname1, sname0)].values
+        v2 = self._source_register[(sname1, sname2)].values
+
+        row0, col0 = v0.nonzero()
+        middle2big = dict(zip(row0, col0))
+
+        row2, col2 = v2.nonzero()
+        n_smalls = len(row2)
+
+        row = np.zeros(n_smalls, dtype=np.int32)
+        col = np.zeros(n_smalls, dtype=np.int32)
+        dat = np.ones(n_smalls, dtype=np.int32)
+
+        for i, ix in enumerate(row2):
+            if ix in middle2big:
+                row[i] = middle2big[ix]
+                col[i] = col2[i]
+
+        self.auto_instancing(
+            np.array([row, col, dat]),
+            sid=(sname0, sname2),
+            N=v0.shape[1],
+            M=v2.shape[1],
+            fname=sname0.split("_")[-1],
+            database=self._database,
+            process_attr=True,
+        )
 
 
 __all__ = []
