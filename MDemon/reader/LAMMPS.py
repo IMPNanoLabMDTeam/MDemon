@@ -7,6 +7,7 @@ from ..core.structureattr import (
     Composition,
     Connection,
     Coordinate,
+    Element,
     Mass,
     Species,
 )
@@ -180,15 +181,15 @@ class DATAReader(ReaderBase):
         if "Atoms" not in sects:
             raise ValueError("Data file was missing Atoms section")
 
-        try:
-            ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
-        except Exception:
-            errmsg = (
-                "Failed to parse atoms section.  You can supply a description "
-                "of the atom_style as a keyword argument, "
-                "eg mda.Universe(..., atom_style='id resid x y z')"
-            )
-            raise ValueError(errmsg) from None
+        # try:
+        ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
+        # except Exception:
+        #     errmsg = (
+        #         "Failed to parse atoms section.  You can supply a description "
+        #         "of the atom_style as a keyword argument, "
+        #         "eg mda.Universe(..., atom_style='id resid x y z')"
+        #     )
+        #     raise ValueError(errmsg) from None
 
         # create mapping of id to index (ie atom id 10 might be the 0th atom)
         mapping = {
@@ -454,6 +455,7 @@ class DATAReader(ReaderBase):
         for i, at in enumerate(types):
             masses[i] = massdict[at]
         Mass(masses, sid=atm, database=dbase)
+        Element.start_from_masses(masses, sid=atm, database=dbase)
         ids = ID(atom_ids, sid=(atm,), database=dbase)
         residx, resids = squash_by(resids)[:2]
         ids._update_source(resids, (mle,))

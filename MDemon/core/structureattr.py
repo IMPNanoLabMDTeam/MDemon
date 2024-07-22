@@ -1,11 +1,12 @@
 import itertools
 from abc import ABCMeta, abstractmethod
+from bisect import bisect_left
 
 import networkx as nx
 import numpy as np
 from scipy import sparse
 
-from .. import _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
+from .. import _ELEMENTS, _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
 from ..lib.util import asiterable, astuple, flat, iterable, wishnotiterable
 from .source import Source1D, Source2D
 from .structure import Atom, Bond, Molecule, Particle, Structure, Topology
@@ -96,11 +97,10 @@ class StructureAttr(object, metaclass=SAttrMeta):
             as well as the first `dict.key` in `source`.
         """
 
-        database.register_source(self)  # source
-        database.register_deep_source(self)  # deep source
+        database.register_source(self)  # register source and deep source
         database.add_Attr(self)
         self._database = database  # database
-        self.timedependent = False  # time-dependent
+        self._timedependent = kwargs.get("timedependent", False)  # time-dependent
         self.timestep = 0  # timestep
 
         if sid is None:
@@ -113,6 +113,10 @@ class StructureAttr(object, metaclass=SAttrMeta):
             self.source = self.deepsource[0]
         else:
             self._update_source(valueslist[0], sid, **kwargs)
+
+    @property
+    def timedependent(self):
+        return self._timedependent
 
     @property
     def targeted_classes(self):
@@ -456,7 +460,54 @@ class AtomAttr(ParticleAttr):
 
 class Element(AtomAttr):
     name = "element"
-    _dtype = str
+    _dtype = "int"
+
+    @classmethod
+    def start_from_masses(cls, masses, sid=None, database=None):
+        values = np.full((len(masses),), "", dtype=str)
+        sorted_elements = _ELEMENTS
+        Emasses = [e[0] for e in sorted_elements]
+
+        # 定义一个函数，通过二分搜索找到最接近的元素
+        def find_closest_element(mass):
+            # 提取所有元素的质量
+            pos = bisect_left(Emasses, mass)  # 找到插入点
+            if pos == 0:
+                return sorted_elements[0][1]
+            if pos == len(sorted_elements):
+                return sorted_elements[-1][1]
+            before = sorted_elements[pos - 1]
+            after = sorted_elements[pos]
+            # 返回最接近的元素
+            if abs(mass - before[0]) < abs(mass - after[0]):
+                return before[1]
+            else:
+                return after[1]
+
+        for i, mass in enumerate(masses):
+            values[i] = find_closest_element(mass).number
+
+        cls(values, sid=sid, database=database)
+
+
+class Valence(AtomAttr):
+    name = "valence"
+    _dtype = "float"
+
+    @classmethod
+    def start_from_bondorders(cls, bondorders, fname="Base", database=None):
+        # compomtrx is a csr_matrix
+        compomtrx = database.composition._source_register[
+            ("Atom_" + fname, "Bond_" + fname)
+        ].values
+
+        # 获取CSR矩阵的索引和指针
+        indptr = compomtrx.indptr
+        indices = compomtrx.indices
+        # 使用高级索引和NumPy的add.reduceat来进行高效求和
+        values = np.add.reduceat(bondorders[indices], indptr[:-1])
+
+        cls(values, sid=("Atom_" + fname), database=database)
 
 
 class TopologyAttr(StructureAttr1D):

@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..core.structureattr import BondOrder, Composition, Connection
+from ..core.structureattr import BondOrder, Composition, Connection, Valence
 from .base import ReaderBase
 
 
@@ -88,7 +88,7 @@ class REAXFFReader(ReaderBase):
         n_bonds /= 2
         n_bonds = np.int32(n_bonds)
         bond_ids = np.arange(1, n_bonds + 1, dtype=np.int32)
-        bos = np.zeros(n_bonds, dtype=np.int32)
+        bos = np.zeros(n_bonds, dtype=np.float32)
         row = np.zeros(2 * n_bonds, dtype=np.int32)
         col = np.zeros(2 * n_bonds, dtype=np.int32)
         data = np.ones(2 * n_bonds, dtype=np.int32)
@@ -108,7 +108,7 @@ class REAXFFReader(ReaderBase):
                 if combi not in combi_sets:
                     combi_sets[combi] = n
                     b_id = bond_ids[n]
-                    bos[n] = np.float32(line[6 + nb + j])
+                    bos[n] = line[4 + nb + j]
                     n += 1
                 else:
                     b_id = bond_ids[combi_sets[combi]]
@@ -132,6 +132,8 @@ class REAXFFReader(ReaderBase):
             M=n_atoms,
             reverse=True,
         )
+
+        Valence.start_from_bondorders(bos, database=dbase)
 
         Connection(
             np.array([row, col, data]),

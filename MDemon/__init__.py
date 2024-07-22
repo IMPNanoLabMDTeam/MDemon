@@ -1,3 +1,6 @@
+import periodictable
+
+
 class ddict(dict):
     """
     A 'disposable' :class:`dict`.
@@ -32,6 +35,13 @@ _STRUCTURE_ATTRS = dlist()
 _PARTICLES = dlist()
 _TOPOLOGIES = dlist()
 _UNIVERSE_ATTRS = dlist()
+
+_ELEMENTS = [
+    (element.mass, element)
+    for element in periodictable.elements
+    if element.mass is not None
+]
+_ELEMENTS.sort(key=lambda x: x[0])  # 按质量排序
 
 from .core import *
 from .reader import *

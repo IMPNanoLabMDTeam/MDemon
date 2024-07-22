@@ -119,7 +119,6 @@ class Database(object):
             self._source_register[attr.name] = {}
             attr._source_register = self._source_register[attr.name]
 
-    def register_deep_source(self, attr):
         if self.time_dependent:
             try:
                 attr._deep_source_register = self._deep_source_register[attr.name]
