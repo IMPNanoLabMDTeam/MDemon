@@ -1,6 +1,5 @@
 import functools
 import numbers
-from collections import defaultdict, deque
 from copy import copy
 
 import matplotlib.pyplot as plt
@@ -306,7 +305,7 @@ class Structure(_MutableBase):
             for i in atm_list:
                 for j in atoms[i].neighbors:
                     if j in atm_set and i > j:
-                        pairs.append((i, j, {"label": mtrx_connect[i, j]}))
+                        pairs.append((int(i), int(j), {"label": mtrx_connect[i, j]}))
 
             G = nx.Graph()
             G.add_edges_from(pairs)
@@ -344,7 +343,20 @@ class Structure(_MutableBase):
         """
         self.atoms2graph()
 
-        cycles = list(nx.cycle_basis(self.atom_graph))
+        cycles = list(nx.simple_cycles(self.atom_graph, length_bound=10))
+        H = nx.Graph()
+        # 添加简单环中的节点和边到子图 H 中
+        for cycle in cycles:
+            # 每个环中的节点
+            H.add_nodes_from(cycle)
+            # 每个环中的边
+            H.add_edges_from(
+                [(cycle[i], cycle[i + 1]) for i in range(len(cycle) - 1)]
+                + [(cycle[-1], cycle[0])]
+            )
+
+        cycles = list(nx.minimum_cycle_basis(H))
+
         sname = "Ring_" + self._fname
         sname_atm = "Atom_" + self._fname
         sname_bnd = "Bond_" + self._fname
