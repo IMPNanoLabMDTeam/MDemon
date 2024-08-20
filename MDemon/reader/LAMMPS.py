@@ -439,6 +439,7 @@ class DATAReader(ReaderBase):
         order = np.argsort(atom_ids)
         atom_ids = atom_ids[order]
         types = types[order]
+        coords = coords[order]
         if has_resid:
             resids = resids[order]
         if has_charge:
