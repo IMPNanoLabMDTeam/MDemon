@@ -514,9 +514,10 @@ class DATAReader(ReaderBase):
             # unitcell = triclinic_box(*unitcell)
         else:
             # Orthogonal
-            unitcell = np.zeros(6, dtype=np.float32)
+            unitcell = np.zeros(12, dtype=np.float32)
             unitcell[:3] = x, y, z
-            unitcell[3:] = 90.0, 90.0, 90.0
+            unitcell[3:6] = 90.0, 90.0, 90.0
+            unitcell[6:] = x1, x2, y1, y2, z1, z2
 
         return unitcell
 

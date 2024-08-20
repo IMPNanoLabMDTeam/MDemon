@@ -13,7 +13,7 @@ def test_create_universe_from_lammpsdatafile():
     a.detailed = False
     assert a.mle_top >= 0
     box = u.box
-    assert len(box) == 6
+    assert len(box) == 12
     m = u.molecules[0]
     assert len(m.atms) > 0
     ag = u.angles[0]
