@@ -10,6 +10,8 @@ from ..core.structureattr import (
     Element,
     Mass,
     Species,
+    Temperature,
+    Velocity,
 )
 from ..core.universe import Box, Timestep
 from .base import DynamicReaderBase, ReaderBase, squash_by
@@ -182,7 +184,9 @@ class DATAReader(ReaderBase):
             raise ValueError("Data file was missing Atoms section")
 
         # try:
-        ids, species, compo, dbase = self._parse_atoms(sects["Atoms"], masses)
+        ids, species, compo, dbase, order, masses = self._parse_atoms(
+            sects["Atoms"], masses
+        )
         # except Exception:
         #     errmsg = (
         #         "Failed to parse atoms section.  You can supply a description "
@@ -192,12 +196,23 @@ class DATAReader(ReaderBase):
         #     raise ValueError(errmsg) from None
 
         # create mapping of id to index (ie atom id 10 might be the 0th atom)
+
+        sname_atm = "Atom_Base"
         mapping = {
             atom_id: i
             for i, atom_id in enumerate(ids._source_register[("Atom_Base",)].values)
         }
         n_atoms = len(mapping)
-        sname_atm = "Atom_Base"
+        if "Velocities" in sects:
+            velocities = self._parse_vel(sects["Velocities"], order)
+        else:
+            velocities = np.zeros((n_atoms, 3))
+
+        Velocity(velocities, sid=(sname_atm,), database=dbase)
+        Temperature.start_from_velocities(
+            velocities, masses, sid=(sname_atm,), database=dbase
+        )
+
         for sname, L, nentries in [
             ("Bond_Base", "Bonds", 2),
             ("Angle_Base", "Angles", 3),
@@ -468,7 +483,7 @@ class DATAReader(ReaderBase):
             compomtrx, sid=(mle, atm), database=dbase, N=n_residues, M=n_atoms
         )
 
-        return ids, species, compo, dbase
+        return ids, species, compo, dbase, order, masses
 
     @staticmethod
     def residx2mtrx(residx):

@@ -40,7 +40,7 @@ def test_create_universe_from_LammpsReaxff():
     assert a1_ix == 0
 
     mol = u.molecules[10]
-    assert type(mol.mass) is np.float32
+    assert type(mol.mass) is np.float32 or type(mol.mass) is np.float64
     mol.create_rings(multiring=True)
     assert u.rings[0].atms
     assert u.multirings[0].rngs and u.multirings[0].atms

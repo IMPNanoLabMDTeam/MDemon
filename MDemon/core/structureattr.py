@@ -438,6 +438,7 @@ class ParticleAttr(StructureAttr1D):
     _tclasses = (Particle,)
 
 
+# TODO: Repair the bug of u1.molecules.mass
 class Mass(ParticleAttr):
     name = "mass"
     _dtype = "float"
@@ -450,6 +451,35 @@ class Mass(ParticleAttr):
 class Charge(ParticleAttr):
     name = "charge"
     _dtype = "float"
+
+
+class Temperature(ParticleAttr):
+    name = "temperature"
+    _dtype = "float"
+
+    @classmethod
+    def start_from_velocities(cls, velocities, masses, sid=None, database=None):
+        # 常量
+        amu_to_kg = 1.66053906660e-27  # 1 amu = 1.66053906660e-27 kg
+        angstrom_per_fs_to_m_per_s = 1e5  # 1 Å/fs = 1e5 m/s
+        kB = 1.380649e-23  # 玻尔兹曼常数，单位：J/K
+
+        # 单位转换
+        velocities_m_per_s = velocities * angstrom_per_fs_to_m_per_s  # 转换速度到 m/s
+        masses_kg = masses * amu_to_kg  # 转换质量到 kg
+
+        # 计算每个原子的动能
+        kinetic_energies = (
+            0.5 * masses_kg[:, np.newaxis] * velocities_m_per_s**2
+        )  # 单位：J
+        kinetic_energy_per_atom = np.sum(
+            kinetic_energies, axis=1
+        )  # 对于每个原子，求和 x, y, z 方向的动能
+
+        # 计算温度
+        temperatures = (2 * kinetic_energy_per_atom) / (3 * kB)
+
+        return cls(temperatures, sid=sid, database=database)
 
 
 class AtomAttr(ParticleAttr):
