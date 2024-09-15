@@ -540,6 +540,11 @@ class Valence(AtomAttr):
         cls(values, sid=("Atom_" + fname), database=database)
 
 
+class LonePair(AtomAttr):
+    name = "lonepair"
+    _dtype = "float"
+
+
 class TopologyAttr(StructureAttr1D):
     _sid0 = "Topology_Base"
     name = "topologyattr"

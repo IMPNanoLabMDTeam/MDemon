@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..core.structureattr import BondOrder, Composition, Connection, Valence
+from ..core.structureattr import BondOrder, Composition, Connection, LonePair, Valence
 from .base import ReaderBase
 
 
@@ -69,6 +69,8 @@ class REAXFFReader(ReaderBase):
         atom_ids = np.zeros(n_atoms, dtype=np.int32)
         types = np.zeros(n_atoms, dtype=np.int32)
         charges = np.zeros(n_atoms, dtype=np.float32)
+        lonepairs = np.zeros(n_atoms, dtype=np.float32)
+
         n_bonds = 0
 
         for i, line in enumerate(datalines):
@@ -77,6 +79,8 @@ class REAXFFReader(ReaderBase):
             types[i] = line[1]
             nb = np.int32(line[2])
             charges[i] = line[6 + nb * 2]
+            lonepairs[i] = line[5 + nb * 2]
+
             n_bonds += nb
 
         order = np.argsort(atom_ids)
@@ -84,6 +88,9 @@ class REAXFFReader(ReaderBase):
         dbase.charge._update_source(
             charges, ("Atom_Base",), ix=np.arange(n_atoms, dtype=np.int32)
         )
+
+        lonepairs = lonepairs[order]
+        LonePair(lonepairs, sid=("Atom_Base",), database=dbase)
 
         n_bonds /= 2
         n_bonds = np.int32(n_bonds)
