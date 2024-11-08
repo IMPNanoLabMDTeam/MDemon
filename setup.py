@@ -2,7 +2,7 @@ import os
 import sys
 
 from Cython.Build import cythonize
-from setuptools import Extension, setup
+from setuptools import Extension, setup, find_packages
 
 use_cython = True
 cython_linetrace = True
@@ -91,4 +91,10 @@ if use_cython:
             if source not in pre_ext.sources:
                 cython_generated.append(source)
 
-setup(ext_modules=extensions, script_args=["build_ext", "--inplace"])
+setup(
+    name="MDemon",       
+    ext_modules=extensions,
+    provides=['MDemon'],
+    packages=find_packages(exclude=["tests"]),
+    # script_args=["build_ext", "--inplace"],
+)
