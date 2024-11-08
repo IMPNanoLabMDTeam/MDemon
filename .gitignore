@@ -21,3 +21,4 @@ htmlcov
 .vscode
 *.lock
 *.ipynb
+*.log
