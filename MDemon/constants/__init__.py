@@ -20,6 +20,7 @@ from .fundamental import PHYSICS
 from .chemistry import CHEMISTRY
 from .conversion import CONVERSION
 from .material import MATERIAL
+from .irradiation import IRRADIATION
 from . import utils
 
 # 便捷导入：最常用的常量直接暴露在顶层
@@ -41,7 +42,7 @@ R_gas = CHEMISTRY.R  # Gas constant
 atomic_mass_unit = CHEMISTRY.u  # Atomic mass unit
 
 __all__ = [
-    'PHYSICS', 'CHEMISTRY', 'CONVERSION', 'MATERIAL',
+    'PHYSICS', 'CHEMISTRY', 'CONVERSION', 'MATERIAL', 'IRRADIATION',
     'k_B', 'N_A', 'c_light', 'h_planck', 'e_charge',
     'ANGSTROM_TO_METER', 'EV_TO_JOULE', 'KCAL_TO_JOULE', 'HARTREE_TO_EV',
     'R_gas', 'atomic_mass_unit'
