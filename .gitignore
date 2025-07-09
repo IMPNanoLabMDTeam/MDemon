@@ -22,3 +22,6 @@ htmlcov
 *.lock
 *.ipynb
 *.log
+
+*.data
+/MDemon.egg-info/

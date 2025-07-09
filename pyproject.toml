@@ -1,0 +1,152 @@
+[build-system]
+requires = [
+    "setuptools >= 61.0",
+    "Cython >= 3.0.0",
+    "numpy >= 1.20.0",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "MDemon"
+version = "0.1.0"
+description = "Molecular Dynamics Analysis Tool with Cython Extensions"
+readme = "README.md"
+license = {text = "GPL-2.0-or-later"}
+authors = [
+    {name = "MDemon Development Team"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Physics",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "numpy >= 1.24.0",
+    "scipy >= 1.10.0",
+    "pandas >= 2.0.0",
+    "matplotlib >= 3.6.0",
+    "periodictable >= 1.5.0",
+    "seaborn >= 0.12.0",
+    "networkx>=3.2.1",
+    "jupyter>=1.1.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black >= 24.0.0",
+    "isort >= 5.12.0",
+    "ruff >= 0.5.0",
+    "pre-commit >= 3.0.0",
+    "pytest >= 7.0.0",
+    "pytest-cov >= 4.0.0",
+    "coverage >= 7.0.0",
+    "Cython >= 3.0.0",
+    "ipykernel >= 6.0.0",
+    "jupyter >= 1.0.0",
+]
+build = [
+    "Cython >= 3.0.0",
+    "numpy >= 1.24.0",
+]
+
+[project.urls]
+Repository = "https://github.com/your-username/MDemon"
+Issues = "https://github.com/your-username/MDemon/issues"
+
+[tool.setuptools]
+packages = ["MDemon", "MDemon.core", "MDemon.lib", "MDemon.reader"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"MDemon.lib" = ["include/*.h"]
+
+# 黑色代码格式化配置
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+    \.git
+  | \.eggs
+  | \.tox
+  | build
+  | dist
+)/
+'''
+
+# isort import排序配置
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+line_length = 88
+
+# pytest测试配置
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--disable-warnings",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "unit: marks tests as unit tests",
+    "integration: marks tests as integration tests",
+]
+
+# 覆盖率配置
+[tool.coverage.run]
+source = ["MDemon"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "setup.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]
+
+# ruff linting配置 (现代flake8替代)
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E203",  # whitespace before ':'
+    "E266",  # too many leading '#' for block comment
+    "E501",  # line too long
+    "C901",  # too complex
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"tests/*" = ["F401", "F403"] 

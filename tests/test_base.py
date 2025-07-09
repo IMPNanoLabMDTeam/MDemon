@@ -1,12 +1,15 @@
+import os
+
 import numpy as np
 
 import MDemon as md
 
 
 def test_create_universe_from_lammpsdatafile():
-    dir_ = r".\tests\data\lammps\CNT\\"
-    filename = r"SWNT-8-8-graphene_hole_h2o_random-66666-1-10-30-3.data"
-    u = md.Universe(dir_ + filename)
+    data_dir = os.path.join("tests", "data", "lammps", "CNT")
+    filename = "SWNT-8-8-graphene_hole_h2o_random-66666-1-10-30-3.data"
+    filepath = os.path.join(data_dir, filename)
+    u = md.Universe(filepath)
     a = u.atoms[0]
     assert len(a.coordinate) == 3
     assert list(a.mle_top.keys())[0] >= 0
@@ -29,10 +32,10 @@ def test_create_universe_from_lammpsdatafile():
 
 
 def test_create_universe_from_LammpsReaxff():
-    dir_ = r".\tests\data\lammps\IrradiatedKapton\\"
-    modelpri = r"KAPTON5_504-33r_irradiated"
-    datafile = dir_ + modelpri + ".data"
-    bondfile = dir_ + modelpri + ".reaxff"
+    data_dir = os.path.join("tests", "data", "lammps", "IrradiatedKapton")
+    modelpri = "KAPTON5_504-33r_irradiated"
+    datafile = os.path.join(data_dir, modelpri + ".data")
+    bondfile = os.path.join(data_dir, modelpri + ".reaxff")
 
     u = md.Universe(datafile, bondfile)
     b1_ix = min(u.atoms[0].bnds)

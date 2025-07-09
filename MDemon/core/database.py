@@ -4,7 +4,7 @@ from .. import _STRUCTURES, _UNIVERSE_ATTRS
 from .structureattr import Absence, Freeze, Index, Silence
 
 
-class Database(object):
+class Database:
     _u = None
 
     def __init__(self, n_atoms, **kwargs):
@@ -152,7 +152,7 @@ class Database(object):
         f.instancing()
 
 
-class Family(object):
+class Family:
     def __init__(self, fname="Base", database=None):
         self.name = fname
         self._database = database

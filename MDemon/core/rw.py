@@ -1,6 +1,6 @@
 import inspect
 
-from .. import _READER_HINTS, _READERS
+from .. import _READERS
 from ..lib import util
 
 

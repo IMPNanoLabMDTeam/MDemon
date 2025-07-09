@@ -59,7 +59,7 @@ def _database_from_file_like(*inputfiles, **kwargs):
     return database
 
 
-class Universe(object):
+class Universe:
     def __init__(self, *inputfiles) -> None:
         self.timestep = 0  # initial timestep
         self._s = False  # silent
@@ -110,7 +110,7 @@ class UniverseAttrMeta(type):
         _UNIVERSE_ATTRS.append(cls)
 
 
-class UniverseAttr(object):
+class UniverseAttr:
     def __init__(self, *values, database):
         self.values = np.array(values)
         self._database = database

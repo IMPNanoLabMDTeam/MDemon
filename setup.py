@@ -2,14 +2,14 @@ import os
 import sys
 
 from Cython.Build import cythonize
-from setuptools import Extension, setup, find_packages
+from setuptools import Extension, setup
 
 use_cython = True
 cython_linetrace = True
 annotate_cython = True
 
 
-class MDExtension(Extension, object):
+class MDExtension(Extension):
     def __init__(self, name, sources, *args, **kwargs):
         self._mda_include_dirs = []
         # don't abspath sources else packaging fails on Windows (issue #3129)
@@ -91,10 +91,7 @@ if use_cython:
             if source not in pre_ext.sources:
                 cython_generated.append(source)
 
+# 只保留ext_modules配置，其他配置已移至pyproject.toml
 setup(
-    name="MDemon",       
     ext_modules=extensions,
-    provides=['MDemon'],
-    packages=find_packages(exclude=["tests"]),
-    # script_args=["build_ext", "--inplace"],
 )

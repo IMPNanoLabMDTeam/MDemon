@@ -46,7 +46,7 @@ class _TopologyMeta(type):
         _STRUCTURES.append(cls)
 
 
-class _StructureAttrContainer(object):
+class _StructureAttrContainer:
     _SETATTR_WHITELIST = ["atom_graph"]
 
     @classmethod
@@ -103,7 +103,7 @@ class _StructureAttrContainer(object):
         super(_StructureAttrContainer, self).__setattr__(attr, value)
 
 
-class _ImmutableBase(object):
+class _ImmutableBase:
     """
     Class used to shortcut :meth:`__new__` to :meth:`object.__new__`.
 
@@ -115,7 +115,7 @@ class _ImmutableBase(object):
     __new__ = object.__new__
 
 
-class _MutableBase(object):
+class _MutableBase:
     """
     Base class that merges appropriate :class:`_StructureAttrContainer` classes.\n
     In it the instantiating class is fetched from :attr:`Universe._classes`.\

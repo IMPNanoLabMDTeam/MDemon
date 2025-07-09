@@ -20,7 +20,7 @@ class _ReaderMeta(type):
                     _READER_HINTS[fmt_name] = classdict["_format_hint"].__func__
 
 
-class ReaderBase(object, metaclass=_ReaderMeta):
+class ReaderBase(metaclass=_ReaderMeta):
     def __init__(self, filename):
         self.filename = filename
 

@@ -4,12 +4,11 @@ from bisect import bisect_left
 
 import networkx as nx
 import numpy as np
-from scipy import sparse
 
 from .. import _ELEMENTS, _STRUCTURE_ATTRS, _STRUCTURE_NAMES, _STRUCTURES
 from ..lib.util import asiterable, astuple, flat, iterable, wishnotiterable
 from .source import Source1D, Source2D
-from .structure import Atom, Bond, Molecule, Particle, Structure, Topology
+from .structure import Atom, Bond, Particle, Structure, Topology
 
 
 def sum_output(func):
@@ -28,7 +27,7 @@ class SAttrMeta(ABCMeta):
         _STRUCTURE_ATTRS.append(cls)
 
 
-class StructureAttr(object, metaclass=SAttrMeta):
+class StructureAttr(metaclass=SAttrMeta):
     """
     Base class of structure attributes.
 

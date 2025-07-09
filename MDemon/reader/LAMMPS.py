@@ -5,7 +5,6 @@ from ..core.structureattr import (
     ID,
     Charge,
     Composition,
-    Connection,
     Coordinate,
     Element,
     Mass,
@@ -13,8 +12,8 @@ from ..core.structureattr import (
     Temperature,
     Velocity,
 )
-from ..core.universe import Box, Timestep
-from .base import DynamicReaderBase, ReaderBase, squash_by
+from ..core.universe import Box
+from .base import ReaderBase, squash_by
 
 # Sections will all start with one of these words
 # and run until the next section title
@@ -276,7 +275,7 @@ class DATAReader(ReaderBase):
             positions, ordering = self._parse_pos(sects["Atoms"])
         except KeyError as err:
             errmsg = f"Position information not found: {err}"
-            raise IOError(errmsg) from None
+            raise OSError(errmsg) from None
 
         if "Velocities" in sects:
             velocities = self._parse_vel(sects["Velocities"], ordering)

@@ -3,30 +3,22 @@ repos:
     hooks:
       - id: isort
         name: isort
-        stages: [commit]
+        stages: [pre-commit]
         language: system
-        entry: conda run -n mdemon isort
+        entry: uv run isort
         types: [python]
 
       - id: black
         name: black
-        stages: [commit]
+        stages: [pre-commit]
         language: system
-        entry: conda run -n mdemon black
+        entry: uv run black
         types: [python]
-
-      - id: flake8
-        name: flake8
-        stages: [commit]
-        language: system
-        entry: conda run -n mdemon flake8
-        types: [python]
-        exclude: setup.pyW
 
       - id: pytest-cov
         name: pytest
-        stages: [push]
+        stages: [pre-push]
         language: system
-        entry: conda run -n mdemon pytest --cov --cov-fail-under=70
+        entry: uv run pytest --cov --cov-fail-under=70
         types: [python]
         pass_filenames: false

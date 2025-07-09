@@ -48,27 +48,7 @@ def _run(
 
 # serial versions are always available (and are typically used within
 # the core and topology modules)
-from .c_distances import (
-    _UINT64_MAX,
-    calc_angle,
-    calc_angle_ortho,
-    calc_angle_triclinic,
-    calc_bond_distance,
-    calc_bond_distance_ortho,
-    calc_bond_distance_triclinic,
-    calc_dihedral,
-    calc_dihedral_ortho,
-    calc_dihedral_triclinic,
-    calc_distance_array,
-    calc_distance_array_ortho,
-    calc_distance_array_triclinic,
-    calc_self_distance_array,
-    calc_self_distance_array_ortho,
-    calc_self_distance_array_triclinic,
-    coord_transform,
-    ortho_pbc,
-    triclinic_pbc,
-)
+from .c_distances import _UINT64_MAX
 
 
 def _check_result_array(result: Optional[npt.NDArray], shape: tuple) -> npt.NDArray:
@@ -102,13 +82,12 @@ def _check_result_array(result: Optional[npt.NDArray], shape: tuple) -> npt.NDAr
         return np.zeros(shape, dtype=np.float64)
     if result.shape != shape:
         raise ValueError(
-            "Result array has incorrect shape, should be {0}, got "
-            "{1}.".format(shape, result.shape)
+            f"Result array has incorrect shape, should be {shape}, got "
+            f"{result.shape}."
         )
     if result.dtype != np.float64:
         raise TypeError(
-            "Result array must be of type numpy.float64, got {}."
-            "".format(result.dtype)
+            f"Result array must be of type numpy.float64, got {result.dtype}."
         )
     # The following two lines would break a lot of tests. WHY?!
     #    if not coords.flags['C_CONTIGUOUS']:

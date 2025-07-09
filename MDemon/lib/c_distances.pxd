@@ -1,4 +1,4 @@
-from libc.stdint cimport uint64_t, UINT64_MAX
+from libc.stdint cimport UINT64_MAX, uint64_t
 
 
 cdef extern from "string.h":

@@ -243,10 +243,9 @@ def check_coords(*coord_names, **options):
         for name in coord_names:
             if name not in posargnames:
                 raise ValueError(
-                    "In decorator check_coords(): Name '{}' "
+                    f"In decorator check_coords(): Name '{name}' "
                     "doesn't correspond to any positional "
-                    "argument of the decorated function {}()."
-                    "".format(name, func.__name__)
+                    f"argument of the decorated function {func.__name__}()."
                 )
 
         def _check_coords(coords, argname):
