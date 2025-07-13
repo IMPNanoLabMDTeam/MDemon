@@ -60,11 +60,11 @@ def _database_from_file_like(*inputfiles, **kwargs):
 
 
 class Universe:
-    def __init__(self, *inputfiles) -> None:
+    def __init__(self, *inputfiles, **kwargs) -> None:
         self.timestep = 0  # initial timestep
         self._s = False  # silent
         self._class_bases = _make_bases()
-        self._database = _database_from_file_like(*inputfiles)
+        self._database = _database_from_file_like(*inputfiles, **kwargs)
         self._database._u = self
 
         _generate_from_database(self._database)

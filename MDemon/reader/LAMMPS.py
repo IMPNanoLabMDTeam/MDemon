@@ -296,9 +296,18 @@ class DATAReader(ReaderBase):
         ids = np.zeros(len(pos), dtype=np.int32)
 
         if self.style_dict is None:
-            if len(datalines[0].split()) in (7, 10):
+            n = len(datalines[0].split())
+            if n in (5, 8):
+                # atomic format: id type x y z (+ flag1 flag2 flag3)
+                style_dict = {"id": 0, "x": 2, "y": 3, "z": 4}
+            elif n in (6, 9):
+                # molecular format: id resid type x y z (+ flag1 flag2 flag3)
+                style_dict = {"id": 0, "x": 3, "y": 4, "z": 5}
+            elif n in (7, 10):
+                # full format: id resid type charge x y z (+ flag1 flag2 flag3)
                 style_dict = {"id": 0, "x": 4, "y": 5, "z": 6}
             else:
+                # fallback
                 style_dict = {"id": 0, "x": 3, "y": 4, "z": 5}
         else:
             style_dict = self.style_dict
@@ -405,14 +414,26 @@ class DATAReader(ReaderBase):
         n_atoms = len(datalines)
 
         if self.style_dict is None:
-            sd = {"id": 0, "resid": 1, "type": 2}
             # Fields per line
             n = len(datalines[0].split())
-            if n in (7, 10):
-                sd["charge"] = 3
-                sd["coord"] = 4
+            if n in (5, 8):
+                # atomic format: id type x y z (+ 可能的flag1 flag2 flag3)
+                # 5字段: id type x y z
+                # 8字段: id type x y z flag1 flag2 flag3
+                sd = {"id": 0, "type": 1, "coord": 2}
+            elif n in (6, 9):
+                # molecular format: id resid type x y z (+ 可能的flag1 flag2 flag3)
+                # 6字段: id resid type x y z
+                # 9字段: id resid type x y z flag1 flag2 flag3
+                sd = {"id": 0, "resid": 1, "type": 2, "coord": 3}
+            elif n in (7, 10):
+                # full format: id resid type charge x y z (+ 可能的flag1 flag2 flag3)
+                # 7字段: id resid type charge x y z
+                # 10字段: id resid type charge x y z flag1 flag2 flag3
+                sd = {"id": 0, "resid": 1, "type": 2, "charge": 3, "coord": 4}
             else:
-                sd["coord"] = 3
+                # fallback for other formats
+                sd = {"id": 0, "resid": 1, "type": 2, "coord": 3}
         else:
             sd = self.style_dict
 
@@ -442,9 +463,20 @@ class DATAReader(ReaderBase):
             types[i] = line[sd["type"]]
             if has_charge:
                 charges[i] = line[sd["charge"]]
-            coords[i] = np.array(
-                list(map(np.float32, line[sd["coord"] : sd["coord"] + 3]))
-            )
+            if "coord" in sd:
+                # 自动检测格式使用coord字段
+                coords[i] = np.array(
+                    list(map(np.float32, line[sd["coord"] : sd["coord"] + 3]))
+                )
+            else:
+                # 明确指定格式使用x, y, z字段
+                coords[i] = np.array(
+                    [
+                        np.float32(line[sd["x"]]),
+                        np.float32(line[sd["y"]]),
+                        np.float32(line[sd["z"]]),
+                    ]
+                )
         # at this point, we've read the atoms section,
         # but it's still (potentially) unordered
         # TODO: Maybe we can optimise by checking if we need to sort
