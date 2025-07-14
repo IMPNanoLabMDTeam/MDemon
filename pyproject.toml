@@ -65,7 +65,7 @@ Repository = "https://github.com/your-username/MDemon"
 Issues = "https://github.com/your-username/MDemon/issues"
 
 [tool.setuptools]
-packages = ["MDemon", "MDemon.core", "MDemon.lib", "MDemon.reader"]
+packages = ["MDemon", "MDemon.core", "MDemon.lib", "MDemon.reader", "MDemon.utils", "MDemon.analysis", "MDemon.analysis.single_atom"]
 include-package-data = true
 
 [tool.setuptools.package-data]

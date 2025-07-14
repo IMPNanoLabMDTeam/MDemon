@@ -43,7 +43,7 @@ _ELEMENTS = [
 ]
 _ELEMENTS.sort(key=lambda x: x[0])  # 按质量排序
 
+from . import analysis, constants
 from .core import *
 from .reader import *
-from . import constants
 from .utils import *
