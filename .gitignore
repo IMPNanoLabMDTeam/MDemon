@@ -25,3 +25,6 @@ htmlcov
 
 *.data
 /MDemon.egg-info/
+
+# examples
+examples/rdf_plots/

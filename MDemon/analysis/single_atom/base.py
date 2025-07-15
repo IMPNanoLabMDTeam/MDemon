@@ -296,6 +296,7 @@ class SingleAtomAnalyzer(ABC):
         metadata.update(kwargs)
 
         return AnalysisResult(
+            universe=self.universe,
             analysis_type=analysis_type,
             atom_indices=list(result_dict.keys()),
             data=result_dict,
@@ -489,12 +490,14 @@ class AnalysisResult:
         创建时间戳
     """
 
-    def __init__(self, analysis_type, atom_indices, data, metadata=None):
+    def __init__(self, universe, analysis_type, atom_indices, data, metadata=None):
         """
         初始化分析结果
 
         Parameters
         ----------
+        universe : Universe
+            宇宙对象
         analysis_type : str
             分析类型
         atom_indices : list
@@ -504,6 +507,7 @@ class AnalysisResult:
         metadata : dict, optional
             元数据信息
         """
+        self.universe = universe
         self.analysis_type = analysis_type
         self.atom_indices = atom_indices
         self.data = data
@@ -720,3 +724,57 @@ def create_atom_selection_mask(universe, **criteria):
         mask = mask & atom_mask
 
     return mask
+
+
+def validate_universe(universe):
+    """
+    Validate Universe objects for single atom analysis
+
+    This function checks if a Universe object has the required attributes
+    and structure for single atom analysis.
+
+    Parameters
+    ----------
+    universe : MDemon.Universe
+        The Universe object to validate
+
+    Returns
+    -------
+    bool
+        True if the universe is valid for single atom analysis
+
+    Raises
+    ------
+    ValueError
+        If the universe is not suitable for single atom analysis
+    """
+    if universe is None:
+        raise ValueError("Universe cannot be None")
+
+    # Check if universe has atoms
+    if not hasattr(universe, "atoms"):
+        raise ValueError("Universe must have atoms attribute")
+
+    if len(universe.atoms) == 0:
+        raise ValueError("Universe contains no atoms")
+
+    # Check if atoms have required attributes
+    for i, atom in enumerate(universe.atoms):
+        if not hasattr(atom, "coordinate"):
+            raise ValueError(f"Atom {i} is missing coordinate attribute")
+
+        if not hasattr(atom, "species"):
+            warnings.warn(f"Atom {i} is missing species attribute")
+
+        if not hasattr(atom, "element"):
+            warnings.warn(f"Atom {i} is missing element attribute")
+
+    # Check if universe has n_atoms attribute
+    if hasattr(universe, "n_atoms"):
+        if universe.n_atoms != len(universe.atoms):
+            warnings.warn(
+                f"Universe.n_atoms ({universe.n_atoms}) does not match "
+                f"actual number of atoms ({len(universe.atoms)})"
+            )
+
+    return True
