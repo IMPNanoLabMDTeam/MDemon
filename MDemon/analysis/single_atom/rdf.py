@@ -10,6 +10,7 @@ Classes:
     RDFResult: Result container for RDF analysis
 """
 
+import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -167,7 +168,6 @@ class RDFResult(AnalysisResult):
         """
         return self.plot_average_rdf(
             species_pairs=species_pairs,
-            plot_type="combined",
             ax=ax,
             show_std=show_std,
             **kwargs,
@@ -383,6 +383,10 @@ class RDFAnalyzer(SingleAtomAnalyzer):
         距离分箱数量，Default: 100
     scheduler : str, optional
         Dask调度器类型，Default: 'threads'
+    enable_spatial_subdivision : bool, optional
+        是否启用空间预分割优化，Default: True
+    use_subdivision_masks : bool, optional
+        是否在空间预分割中使用掩码，Default: False。对于大体系建议保持False
     **kwargs : dict
         传递给父类的其他参数
     """
@@ -394,13 +398,47 @@ class RDFAnalyzer(SingleAtomAnalyzer):
         r_range=(0.0, 10.0),
         n_bins=100,
         scheduler="threads",
+        enable_spatial_subdivision=True,
+        use_subdivision_masks=False,
         **kwargs,
     ):
-        super().__init__(universe, atom_selection, scheduler=scheduler, **kwargs)
+        # 使用r_range的最大值作为空间预分割的截断半径
+        r_cutoff = r_range[1] if enable_spatial_subdivision else None
+
+        super().__init__(
+            universe,
+            atom_selection=atom_selection,
+            scheduler=scheduler,
+            enable_spatial_subdivision=enable_spatial_subdivision,
+            r_cutoff=r_cutoff,
+            use_subdivision_masks=use_subdivision_masks,
+            **kwargs,
+        )
         self.r_range = r_range
         self.n_bins = n_bins
         self.r_bins = np.linspace(r_range[0], r_range[1], n_bins + 1)
         self.dr = self.r_bins[1] - self.r_bins[0]
+
+        # 预计算并缓存球壳体积，避免重复计算
+        self._shell_volumes = self._compute_shell_volumes()
+
+    def _compute_shell_volumes(self):
+        """
+        计算球壳体积并缓存
+
+        Returns
+        -------
+        numpy.ndarray
+            每个球壳的体积数组
+        """
+        r_inner = self.r_bins[:-1]
+        r_outer = self.r_bins[1:]
+        shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
+
+        # 避免除零
+        shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1.0)
+
+        return shell_volumes
 
     def analyze_single_atom(self, atom_index, **kwargs):
         """
@@ -418,23 +456,92 @@ class RDFAnalyzer(SingleAtomAnalyzer):
         dict
             按原子类型分组的RDF字典，格式为 {species: (r_values, rdf_values)}
         """
+        if self.show_running_time:
+            start_total = time.perf_counter()
+            print(f"\n[DEBUG] === Analyzing atom {atom_index} ===")
+
         # 获取原子坐标和原子类型 - 使用MDemon规范的属性名称
+        if self.show_running_time:
+            t1 = time.perf_counter()
+
         atoms = self.universe.atoms
-        coordinates = atoms.coordinate
-        species = atoms.species
+        all_coordinates = atoms.coordinate
+        all_species = atoms.species
 
-        # 获取中心原子位置
-        center_pos = coordinates[atom_index : atom_index + 1]  # 保持2D形状
+        if self.show_running_time:
+            t2 = time.perf_counter()
+            print(f"[DEBUG] 获取原子坐标和类型: {(t2-t1)*1000:.3f} ms")
+            print(f"[DEBUG] 总原子数: {len(all_coordinates)}")
 
-        # 计算RDF
-        rdf_results = self._compute_rdf_optimized(center_pos, coordinates, species)
+        # 使用空间预分割获取相关原子（如果启用）
+        if self.show_running_time:
+            t3 = time.perf_counter()
+
+        relevant_atom_indices, combined_mask = self._get_relevant_atoms_for_analysis(
+            atom_index
+        )
+
+        if self.show_running_time:
+            t4 = time.perf_counter()
+            print(f"[DEBUG] 空间预分割获取相关原子: {(t4-t3)*1000:.3f} ms")
+            print(
+                f"[DEBUG] 相关原子数量: {len(relevant_atom_indices) if relevant_atom_indices is not None else 'All'}"
+            )
+
+        # 筛选坐标和物种信息
+        if self.show_running_time:
+            t5 = time.perf_counter()
+
+        if combined_mask is not None:
+            coordinates = all_coordinates[combined_mask]
+            species = all_species[combined_mask]
+        else:
+            coordinates = all_coordinates[relevant_atom_indices]
+            species = all_species[relevant_atom_indices]
+
+        if self.show_running_time:
+            t6 = time.perf_counter()
+            print(f"[DEBUG] 筛选坐标和物种信息: {(t6-t5)*1000:.3f} ms")
+            print(f"[DEBUG] 筛选后原子数: {len(coordinates)}")
+
+        # 获取中心原子在筛选后数组中的新位置
+        # 中心原子应该在相关原子中，找到它的新索引
+        if self.show_running_time:
+            t7 = time.perf_counter()
+
+        original_center_pos = all_coordinates[atom_index : atom_index + 1]  # 保持2D形状
+
+        if self.show_running_time:
+            t8 = time.perf_counter()
+            print(f"[DEBUG] 获取中心原子位置: {(t8-t7)*1000:.3f} ms")
+
+        # 计算RDF（传入筛选后的坐标和物种）
+        if self.show_running_time:
+            t9 = time.perf_counter()
+
+        rdf_results = self._compute_rdf_optimized(
+            original_center_pos, coordinates, species
+        )
+
+        if self.show_running_time:
+            t10 = time.perf_counter()
+            print(f"[DEBUG] RDF计算: {(t10-t9)*1000:.3f} ms")
+            print(f"[DEBUG] 计算得到的物种数: {len(rdf_results)}")
 
         # 重新格式化结果
+        if self.show_running_time:
+            t11 = time.perf_counter()
+
         result = {}
         r_values = self.r_bins[:-1]
 
-        for species, rdf_values in rdf_results.items():
-            result[species] = (r_values, rdf_values)
+        for species_type, rdf_values in rdf_results.items():
+            result[species_type] = (r_values, rdf_values)
+
+        if self.show_running_time:
+            t12 = time.perf_counter()
+            print(f"[DEBUG] 格式化结果: {(t12-t11)*1000:.3f} ms")
+            print(f"[DEBUG] === 总时间: {(t12-start_total)*1000:.3f} ms ===\n")
 
         return result
 
@@ -485,58 +592,144 @@ class RDFAnalyzer(SingleAtomAnalyzer):
         dict
             包含各种原子类型RDF的字典，格式为 {species: rdf_values}
         """
+        if self.show_running_time:
+            start_rdf = time.perf_counter()
+            print(
+                f"  [RDF DEBUG] 开始RDF计算，参考原子数: {len(reference_coordinates)}"
+            )
+
         # 使用MDemon的高效距离计算函数
+        if self.show_running_time:
+            t1 = time.perf_counter()
+
         box_dims = self.universe.box[:6]
 
+        if self.show_running_time:
+            t2 = time.perf_counter()
+            print(f"  [RDF DEBUG] 获取盒子维度: {(t2-t1)*1000:.3f} ms")
+
         # 计算距离
+        if self.show_running_time:
+            t3 = time.perf_counter()
+
         distances = distance_array(
             reference=center_pos, configuration=reference_coordinates, box=box_dims
         ).flatten()  # 展平成一维数组
 
+        if self.show_running_time:
+            t4 = time.perf_counter()
+            print(f"  [RDF DEBUG] 距离矩阵计算: {(t4-t3)*1000:.3f} ms")
+            print(f"  [RDF DEBUG] 计算的距离数: {len(distances)}")
+
         # 移除距离为0的原子（即中心原子本身）
         # 使用小的容差值来处理浮点数精度问题
+        if self.show_running_time:
+            t5 = time.perf_counter()
+
         tolerance = 1e-10
         valid_mask = distances > tolerance
         distances = distances[valid_mask]
         reference_species_filtered = reference_species[valid_mask]
+
+        if self.show_running_time:
+            t6 = time.perf_counter()
+            print(f"  [RDF DEBUG] 过滤距离为0的原子: {(t6-t5)*1000:.3f} ms")
+            print(f"  [RDF DEBUG] 有效距离数: {len(distances)}")
 
         if len(distances) == 0:
             warnings.warn("No reference atoms found for RDF calculation")
             return {}
 
         # 获取所有唯一的原子类型
+        if self.show_running_time:
+            t7 = time.perf_counter()
+
         unique_species = np.unique(reference_species_filtered)
+
+        if self.show_running_time:
+            t8 = time.perf_counter()
+            print(f"  [RDF DEBUG] 获取唯一物种: {(t8-t7)*1000:.3f} ms")
+            print(f"  [RDF DEBUG] 物种类型: {unique_species}")
 
         rdf_results = {}
 
         # 分别计算每种原子类型的RDF
-        for species in unique_species:
+        for i, species in enumerate(unique_species):
+            if self.show_running_time:
+                t_species_start = time.perf_counter()
+
             species_mask = reference_species_filtered == species
             species_distances = distances[species_mask]
 
+            if self.show_running_time:
+                t_mask = time.perf_counter()
+                print(
+                    f"  [RDF DEBUG] 物种 {species} 掩码筛选: {(t_mask-t_species_start)*1000:.3f} ms"
+                )
+                print(f"  [RDF DEBUG] 物种 {species} 距离数: {len(species_distances)}")
+
             if len(species_distances) > 0:
                 # 计算直方图
+                if self.show_running_time:
+                    t_hist_start = time.perf_counter()
+
                 hist, _ = np.histogram(species_distances, bins=self.r_bins)
 
+                if self.show_running_time:
+                    t_hist_end = time.perf_counter()
+                    print(
+                        f"  [RDF DEBUG] 物种 {species} 直方图计算: {(t_hist_end-t_hist_start)*1000:.3f} ms"
+                    )
+
                 # 归一化
+                if self.show_running_time:
+                    t_norm_start = time.perf_counter()
+
                 rdf_values = self._normalize_rdf(hist, len(species_distances))
                 rdf_results[species] = rdf_values
+
+                if self.show_running_time:
+                    t_norm_end = time.perf_counter()
+                    print(
+                        f"  [RDF DEBUG] 物种 {species} 归一化: {(t_norm_end-t_norm_start)*1000:.3f} ms"
+                    )
+                    print(
+                        f"  [RDF DEBUG] 物种 {species} 总处理时间: {(t_norm_end-t_species_start)*1000:.3f} ms"
+                    )
             else:
                 rdf_results[species] = np.zeros(len(self.r_bins) - 1)
+                if self.show_running_time:
+                    print(f"  [RDF DEBUG] 物种 {species} 无有效距离，填充零值")
+
+        if self.show_running_time:
+            end_rdf = time.perf_counter()
+            print(f"  [RDF DEBUG] RDF计算总时间: {(end_rdf-start_rdf)*1000:.3f} ms")
 
         return rdf_results
 
     def _normalize_rdf(self, hist, n_reference):
-        """归一化RDF"""
-        # 计算每个球壳的体积
-        r_inner = self.r_bins[:-1]
-        r_outer = self.r_bins[1:]
-        shell_volumes = (4.0 / 3.0) * np.pi * (r_outer**3 - r_inner**3)
+        """
+        归一化RDF
 
-        # 避免除零
-        shell_volumes = np.where(shell_volumes > 0, shell_volumes, 1.0)
+        使用预计算的球壳体积进行归一化，避免重复计算
+        """
+        if self.show_running_time:
+            start_norm = time.perf_counter()
+
+        # 使用缓存的球壳体积
+        if self.show_running_time:
+            t1 = time.perf_counter()
+
+        shell_volumes = self._shell_volumes
+
+        if self.show_running_time:
+            t2 = time.perf_counter()
+            print(f"    [NORM DEBUG] 获取缓存的球壳体积: {(t2-t1)*1000:.3f} ms")
 
         # 计算数密度
+        if self.show_running_time:
+            t3 = time.perf_counter()
+
         if n_reference > 0:
             number_density = hist / shell_volumes
             # 这里需要知道系统的总体积来计算正确的RDF
@@ -544,6 +737,11 @@ class RDFAnalyzer(SingleAtomAnalyzer):
             rdf_values = number_density / (n_reference / np.sum(shell_volumes))
         else:
             rdf_values = np.zeros_like(hist, dtype=float)
+
+        if self.show_running_time:
+            t4 = time.perf_counter()
+            print(f"    [NORM DEBUG] 数密度计算和归一化: {(t4-t3)*1000:.3f} ms")
+            print(f"    [NORM DEBUG] 归一化总时间: {(t4-start_norm)*1000:.3f} ms")
 
         return rdf_values
 

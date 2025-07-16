@@ -19,6 +19,7 @@ import numpy as np
 from dask import delayed
 
 from ...utils.parallel import DaskParallelManager
+from ...utils.spatial import SpatialSubdivision
 
 
 class SingleAtomAnalyzer(ABC):
@@ -53,7 +54,17 @@ class SingleAtomAnalyzer(ABC):
         选中的原子数量
     """
 
-    def __init__(self, universe, atom_selection=None, scheduler="threads", **kwargs):
+    def __init__(
+        self,
+        universe,
+        atom_selection=None,
+        scheduler="threads",
+        enable_spatial_subdivision=True,
+        r_cutoff=None,
+        use_subdivision_masks=False,
+        show_running_time=False,
+        **kwargs,
+    ):
         """
         初始化单原子分析器
 
@@ -66,6 +77,14 @@ class SingleAtomAnalyzer(ABC):
             默认为None（等价于全选所有原子）
         scheduler : str, optional
             Dask调度器：'threads', 'processes', 'distributed'
+        enable_spatial_subdivision : bool, optional
+            是否启用空间预分割优化，默认为True
+        r_cutoff : float, optional
+            空间预分割的截断半径，如果为None则由子类确定
+        use_subdivision_masks : bool, optional
+            是否在空间预分割中使用掩码，默认为False。对于大体系建议保持False
+        show_running_time : bool, optional
+            是否显示运行时间调试信息，默认为False
         **kwargs : dict
             传递给DaskParallelManager的其他参数
         """
@@ -80,6 +99,19 @@ class SingleAtomAnalyzer(ABC):
 
         # 分析配置
         self.config = AnalysisConfig()
+
+        # 空间预分割设置
+        self.enable_spatial_subdivision = enable_spatial_subdivision
+        self.r_cutoff = r_cutoff
+        self.use_subdivision_masks = use_subdivision_masks
+        self.spatial_subdivision = None
+
+        # 时间调试设置
+        self.show_running_time = show_running_time
+
+        # 如果启用空间预分割且有截断半径，立即初始化
+        if self.enable_spatial_subdivision and self.r_cutoff is not None:
+            self._initialize_spatial_subdivision()
 
         # 结果缓存
         self._results_cache = {}
@@ -151,6 +183,73 @@ class SingleAtomAnalyzer(ABC):
             # atom_selection是一个掩码，长度为len(self.universe.atoms)
             return np.where(self.atom_selection)[0].tolist()
 
+    def _initialize_spatial_subdivision(self):
+        """初始化空间预分割"""
+        if self.r_cutoff is None:
+            warnings.warn("Cannot initialize spatial subdivision without r_cutoff")
+            return
+
+        try:
+            self.spatial_subdivision = SpatialSubdivision(
+                self.universe, self.r_cutoff, use_masks=self.use_subdivision_masks
+            )
+            mask_status = (
+                "with masks" if self.use_subdivision_masks else "without masks"
+            )
+            print(
+                f"Spatial subdivision initialized with cutoff {self.r_cutoff:.3f} Å ({mask_status})"
+            )
+        except Exception as e:
+            warnings.warn(f"Failed to initialize spatial subdivision: {e}")
+            self.enable_spatial_subdivision = False
+
+    def _get_relevant_atoms_for_analysis(self, atom_index: int):
+        """
+        获取分析某个原子时需要考虑的所有相关原子
+
+        Parameters
+        ----------
+        atom_index : int
+            中心原子索引
+
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            (relevant_atom_indices, combined_mask) - 相关原子索引和掩码
+            如果未启用空间预分割，返回所有原子
+        """
+        if self.enable_spatial_subdivision and self.spatial_subdivision is not None:
+            # 使用空间预分割获取相关原子
+            atom_subdivision = self.spatial_subdivision.get_subdivision_for_atom(
+                atom_index
+            )
+            relevant_atoms, mask = (
+                self.spatial_subdivision.get_relevant_atoms_for_subdivision(
+                    atom_subdivision
+                )
+            )
+
+            return relevant_atoms, mask
+        else:
+            # 如果未启用空间预分割，返回所有原子
+            n_atoms = len(self.universe.atoms)
+            all_atoms = np.arange(n_atoms)
+            all_mask = np.ones(n_atoms, dtype=bool)
+            return all_atoms, all_mask
+
+    def set_spatial_subdivision_cutoff(self, r_cutoff: float):
+        """
+        设置空间预分割的截断半径并重新初始化
+
+        Parameters
+        ----------
+        r_cutoff : float
+            新的截断半径
+        """
+        self.r_cutoff = r_cutoff
+        if self.enable_spatial_subdivision:
+            self._initialize_spatial_subdivision()
+
     @abstractmethod
     def analyze_single_atom(self, atom_index: int, **kwargs) -> Any:
         """
@@ -195,6 +294,13 @@ class SingleAtomAnalyzer(ABC):
 
         # 验证原子索引
         atom_indices = self._validate_atom_indices(atom_indices)
+
+        # 如果启用时间调试，限制原子数量不超过3
+        if self.show_running_time and len(atom_indices) > 3:
+            atom_indices = atom_indices[:3]
+            print(
+                f"[DEBUG] show_running_time enabled, limiting analysis to first 3 atoms: {atom_indices}"
+            )
 
         # Dask自动优化内存使用和任务调度
         results = self.parallel_manager.parallel_apply(
