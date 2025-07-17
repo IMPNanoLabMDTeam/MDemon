@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 
+from .angular import AngularAnalyzer
 from .base import AnalysisConfig, validate_universe
 from .rdf import RDFAnalyzer
 
@@ -91,8 +92,23 @@ class SingleAtomAnalysis:
         analyzer
             分析器实例
         """
-        # 创建缓存键
-        cache_key = (analyzer_type, tuple(sorted(kwargs.items())))
+        # 创建缓存键，处理字典类型的参数
+        hashable_kwargs = []
+        for key, value in sorted(kwargs.items()):
+            if isinstance(value, dict):
+                # 将字典转换为可哈希的tuple of tuples
+                hashable_value = tuple(sorted(value.items()))
+            elif isinstance(value, list):
+                # 将列表转换为tuple
+                hashable_value = tuple(value)
+            elif isinstance(value, np.ndarray):
+                # 将numpy数组转换为tuple
+                hashable_value = tuple(value.flatten())
+            else:
+                hashable_value = value
+            hashable_kwargs.append((key, hashable_value))
+
+        cache_key = (analyzer_type, tuple(hashable_kwargs))
 
         if cache_key not in self._analyzers:
             # 合并默认参数和用户参数
@@ -101,6 +117,10 @@ class SingleAtomAnalysis:
             # 创建分析器实例
             if analyzer_type == "rdf":
                 self._analyzers[cache_key] = RDFAnalyzer(
+                    universe=self.universe, **merged_kwargs
+                )
+            elif analyzer_type == "angular":
+                self._analyzers[cache_key] = AngularAnalyzer(
                     universe=self.universe, **merged_kwargs
                 )
             else:
@@ -158,6 +178,68 @@ class SingleAtomAnalysis:
             atom_indices=atom_indices, reference_atoms=reference_atoms, **kwargs
         )
 
+    def angular(
+        self,
+        cutoff_radii,
+        atom_selection=None,
+        atom_indices=None,
+        angle_range=(0.0, np.pi),
+        n_bins=90,
+        scheduler="threads",
+        **kwargs,
+    ):
+        """
+        角分布分析
+
+        Parameters
+        ----------
+        atom_selection : numpy.ndarray, optional
+            原子选择掩码，长度为len(universe.atoms)的布尔数组
+        atom_indices : List[int], optional
+            要分析的原子索引列表，如果提供则覆盖atom_selection
+        cutoff_radii : dict
+            三原子类型的截断半径字典，格式为 {'1-1': 2.5, '1-2': 3.0, ...}
+            其中键表示三原子类型：
+            - '1-1' 表示 1-1-1 角分布（同类型原子）
+            - '1-2' 表示 2-1-2 角分布（不同类型原子）
+            此参数是必需的，因为截断半径是高度特异的
+        angle_range : tuple, optional
+            角度范围（弧度） (angle_min, angle_max)，Default: (0.0, π)
+        n_bins : int, optional
+            角度分箱数量，Default: 90
+        scheduler : str, optional
+            Dask调度器类型，Default: 'threads'
+        **kwargs : dict
+            传递给AngularAnalyzer的其他参数
+
+        Returns
+        -------
+        AngularResult
+            角分布分析结果对象
+
+        Notes
+        -----
+        角分布分析计算中心原子与两个邻近原子之间的夹角分布。
+        支持的三原子类型：
+        - a-a-a类型：同类型原子组合
+        - a-b-a类型：不同类型原子组合
+
+        截断半径用于限制邻近原子的搜索范围，不同原子对可以设置不同的截断半径。
+        """
+        # 获取分析器
+        analyzer = self._get_analyzer(
+            "angular",
+            atom_selection=atom_selection,
+            cutoff_radii=cutoff_radii,
+            angle_range=angle_range,
+            n_bins=n_bins,
+            scheduler=scheduler,
+            **kwargs,
+        )
+
+        # 执行分析
+        return analyzer.analyze_parallel(atom_indices=atom_indices, **kwargs)
+
     def analyze_all(self, atom_selection=None, atom_indices=None, **kwargs):
         """
         执行所有可用的分析
@@ -187,6 +269,15 @@ class SingleAtomAnalysis:
             warnings.warn(f"RDF analysis failed: {e}")
             results["rdf"] = None
 
+        # 角分布分析
+        try:
+            results["angular"] = self.angular(
+                atom_selection=atom_selection, atom_indices=atom_indices, **kwargs
+            )
+        except Exception as e:
+            warnings.warn(f"Angular analysis failed: {e}")
+            results["angular"] = None
+
         # 扩散分析（待实现）
         results["diffusion"] = None
 
@@ -206,6 +297,7 @@ class SingleAtomAnalysis:
         """
         return {
             "rdf": "available",
+            "angular": "available",
             "diffusion": "not_implemented",
             "coordination": "not_implemented",
         }

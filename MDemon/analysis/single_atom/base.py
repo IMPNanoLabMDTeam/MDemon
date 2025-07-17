@@ -596,7 +596,15 @@ class AnalysisResult:
         创建时间戳
     """
 
-    def __init__(self, universe, analysis_type, atom_indices, data, metadata=None):
+    def __init__(
+        self,
+        analysis_type,
+        atom_indices,
+        data,
+        metadata=None,
+        universe=None,
+        averaged_data=None,
+    ):
         """
         初始化分析结果
 
@@ -619,6 +627,7 @@ class AnalysisResult:
         self.data = data
         self.metadata = metadata or {}
         self.timestamp = datetime.now()
+        self.averaged_data = averaged_data
 
     def get_result(self, atom_index):
         """
@@ -662,6 +671,7 @@ class AnalysisResult:
             "data": self.data,
             "metadata": self.metadata,
             "timestamp": self.timestamp.isoformat(),
+            "averaged_data": self.averaged_data,
         }
 
     def save(self, filename, format="pickle"):
@@ -765,6 +775,7 @@ class AnalysisResult:
             atom_indices=data["atom_indices"],
             data=data["data"],
             metadata=data["metadata"],
+            averaged_data=data["averaged_data"],
         )
 
     def __repr__(self):

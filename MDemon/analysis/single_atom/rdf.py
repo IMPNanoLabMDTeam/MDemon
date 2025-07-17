@@ -322,6 +322,7 @@ class RDFResult(AnalysisResult):
                     "std_rdf": std_rdf,
                     "n_samples": len(rdf_values_list),
                 }
+        self.averaged_data = averaged_data
         return averaged_data
 
     def plot_species_comparison(self, atom_index, ax=None, **kwargs):
@@ -410,7 +411,7 @@ class RDFAnalyzer(SingleAtomAnalyzer):
             atom_selection=atom_selection,
             scheduler=scheduler,
             enable_spatial_subdivision=enable_spatial_subdivision,
-            r_cutoff=r_cutoff,
+            r_cutoff=r_cutoff if r_cutoff > 10 else 10,
             use_subdivision_masks=use_subdivision_masks,
             **kwargs,
         )

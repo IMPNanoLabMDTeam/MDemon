@@ -1,42 +1,55 @@
 """
-Single Atom Analysis Module for MDemon
+Single atom analysis for MDemon
 
-This module provides comprehensive single atom analysis capabilities including:
-- Radial distribution function (RDF) analysis
-- Diffusion coefficient calculation
-- Coordination number analysis
-- Parallel processing with automatic memory management
+This module provides various analysis capabilities for single atoms in molecular dynamics systems.
 
-Classes:
-    SingleAtomAnalyzer: Abstract base class for all single atom analyzers
-    AnalysisConfig: Configuration management for analysis parameters
-    AnalysisResult: Base class for analysis results
-
-Functions:
-    create_atom_selection_mask: Create atom selection masks with various criteria
-    validate_universe: Validate Universe objects for single atom analysis
+Main classes:
+    SingleAtomAnalysis: Unified interface for all single atom analyses
+    RDFAnalyzer: Radial distribution function analysis
+    AngularAnalyzer: Angular distribution analysis
+    RDFResult: Container for RDF analysis results
+    AngularResult: Container for angular analysis results
 """
 
-from .base import (
-    AnalysisConfig,
-    AnalysisResult,
-    SingleAtomAnalyzer,
-    create_atom_selection_mask,
-    validate_universe,
-)
+from .angular import AngularAnalyzer, AngularResult
+from .base import AnalysisConfig, AnalysisResult, SingleAtomAnalyzer
 from .main import SingleAtomAnalysis
 from .rdf import RDFAnalyzer, RDFResult
 
 __all__ = [
+    # Main interface
+    "SingleAtomAnalysis",
+    # Base classes
     "SingleAtomAnalyzer",
-    "AnalysisConfig",
     "AnalysisResult",
-    "create_atom_selection_mask",
-    "validate_universe",
+    "AnalysisConfig",
+    # RDF analysis
     "RDFAnalyzer",
     "RDFResult",
-    "SingleAtomAnalysis",
+    # Angular analysis
+    "AngularAnalyzer",
+    "AngularResult",
 ]
 
-__version__ = "0.1.0"
-__author__ = "MDemon Development Team"
+# Version information
+__version__ = "1.0.0"
+
+# Analysis types
+AVAILABLE_ANALYSES = {
+    "rdf": "Radial Distribution Function",
+    "angular": "Angular Distribution Function",
+    "diffusion": "Diffusion Analysis (not implemented)",
+    "coordination": "Coordination Number Analysis (not implemented)",
+}
+
+
+def get_available_analyses():
+    """
+    Get information about available analysis types
+
+    Returns
+    -------
+    dict
+        Dictionary of available analysis types and descriptions
+    """
+    return AVAILABLE_ANALYSES.copy()
