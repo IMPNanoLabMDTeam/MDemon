@@ -1,0 +1,23 @@
+include README.md
+include LICENSE
+include *.md
+include *.yml
+include *.yaml
+include *.cfg
+include *.toml
+recursive-include docs *.md
+recursive-include examples *.py
+recursive-include MDemon/lib/include *.h
+recursive-include MDemon *.pyx
+recursive-include MDemon *.pxd
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *~
+global-exclude __pycache__
+global-exclude .git*
+global-exclude .pytest_cache
+global-exclude .ruff_cache
+global-exclude .venv
+global-exclude build
+global-exclude dist
+global-exclude *.egg-info

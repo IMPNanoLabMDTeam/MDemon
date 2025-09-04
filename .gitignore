@@ -26,6 +26,11 @@ htmlcov
 *.data
 /MDemon.egg-info/
 
+# Build and distribution
+dist/
+build/
+*.egg-info/
+
 # examples
 examples/rdf_plots/
 examples/results/
