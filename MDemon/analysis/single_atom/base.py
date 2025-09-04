@@ -604,6 +604,7 @@ class AnalysisResult:
         metadata=None,
         universe=None,
         averaged_data=None,
+        distributions=None,
     ):
         """
         初始化分析结果
@@ -628,6 +629,7 @@ class AnalysisResult:
         self.metadata = metadata or {}
         self.timestamp = datetime.now()
         self.averaged_data = averaged_data
+        self.distributions = distributions
 
     def get_result(self, atom_index):
         """
@@ -672,6 +674,7 @@ class AnalysisResult:
             "metadata": self.metadata,
             "timestamp": self.timestamp.isoformat(),
             "averaged_data": self.averaged_data,
+            "distributions": self.distributions,
         }
 
     def save(self, filename, format="pickle"):
@@ -776,6 +779,7 @@ class AnalysisResult:
             data=data["data"],
             metadata=data["metadata"],
             averaged_data=data["averaged_data"],
+            distributions=data["distributions"] if "distributions" in data else None,
         )
 
     def __repr__(self):

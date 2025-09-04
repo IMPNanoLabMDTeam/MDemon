@@ -28,3 +28,4 @@ htmlcov
 
 # examples
 examples/rdf_plots/
+examples/results/

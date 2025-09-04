@@ -15,6 +15,7 @@ import numpy as np
 
 from .angular import AngularAnalyzer
 from .base import AnalysisConfig, validate_universe
+from .coordination import CoordinationAnalyzer
 from .rdf import RDFAnalyzer
 
 
@@ -22,7 +23,7 @@ class SingleAtomAnalysis:
     """
     单原子分析主接口
 
-    这个类提供了一个统一的接口来访问所有单原子分析功能，包括RDF、扩散、配位数等分析。
+    这个类提供了一个统一的接口来访问所有单原子分析功能，包括RDF、角分布、配位数等分析。
     它自动管理不同分析器的实例化和配置，简化用户的使用体验。
 
     Parameters
@@ -50,6 +51,16 @@ class SingleAtomAnalysis:
     >>>
     >>> # RDF分析
     >>> rdf_result = analysis.rdf(atom_indices=[0, 1, 2])
+    >>>
+    >>> # 配位数分析
+    >>> cutoff_radii = {'1-1': 2.5, '1-2': 3.0}
+    >>> coord_result = analysis.coordination(cutoff_radii=cutoff_radii, atom_indices=[0, 1, 2])
+    >>>
+    >>> # 角分布分析
+    >>> angular_result = analysis.angular(cutoff_radii=cutoff_radii, atom_indices=[0, 1, 2])
+    >>>
+    >>> # 执行所有分析
+    >>> all_results = analysis.analyze_all(cutoff_radii=cutoff_radii, atom_indices=[0, 1, 2])
     """
 
     def __init__(self, universe, config=None, **kwargs):
@@ -121,6 +132,10 @@ class SingleAtomAnalysis:
                 )
             elif analyzer_type == "angular":
                 self._analyzers[cache_key] = AngularAnalyzer(
+                    universe=self.universe, **merged_kwargs
+                )
+            elif analyzer_type == "coordination":
+                self._analyzers[cache_key] = CoordinationAnalyzer(
                     universe=self.universe, **merged_kwargs
                 )
             else:
@@ -240,6 +255,63 @@ class SingleAtomAnalysis:
         # 执行分析
         return analyzer.analyze_parallel(atom_indices=atom_indices, **kwargs)
 
+    def coordination(
+        self,
+        cutoff_radii,
+        atom_selection=None,
+        atom_indices=None,
+        scheduler="threads",
+        **kwargs,
+    ):
+        """
+        配位数分析
+
+        Parameters
+        ----------
+        cutoff_radii : dict
+            中心-邻近原子对的截断半径字典，格式为 {'1-1': 2.5, '1-2': 3.0, ...}
+            其中键表示中心-邻近原子对：
+            - '1-1' 表示中心原子类型1，邻近原子类型1
+            - '1-2' 表示中心原子类型1，邻近原子类型2
+            此参数是必需的，因为截断半径是高度特异的
+        atom_selection : numpy.ndarray, optional
+            原子选择掩码，长度为len(universe.atoms)的布尔数组
+        atom_indices : List[int], optional
+            要分析的原子索引列表，如果提供则覆盖atom_selection
+        scheduler : str, optional
+            Dask调度器类型，Default: 'threads'
+        **kwargs : dict
+            传递给CoordinationAnalyzer的其他参数
+
+        Returns
+        -------
+        CoordinationResult
+            配位数分析结果对象
+
+        Notes
+        -----
+        配位数分析计算每个原子的配位环境，与RDF和角分布分析不同，
+        配位数分析重点保留每个原子的个体配位数值，而不是平均分布。
+
+        这使得配位数分析特别适用于：
+        - 缺陷分析：识别配位数异常的原子
+        - 界面研究：分析界面区域的配位环境
+        - 结构多样性：研究局部结构的多样性
+
+        截断半径用于定义配位邻近的范围，不同原子对可以设置不同的截断半径。
+        """
+        # 获取分析器
+        analyzer = self._get_analyzer(
+            "coordination",
+            atom_selection=atom_selection,
+            cutoff_radii=cutoff_radii,
+            scheduler=scheduler,
+            **kwargs,
+        )
+
+        # 执行分析
+        return analyzer.analyze_parallel(atom_indices=atom_indices, **kwargs)
+
     def analyze_all(self, atom_selection=None, atom_indices=None, **kwargs):
         """
         执行所有可用的分析
@@ -271,18 +343,34 @@ class SingleAtomAnalysis:
 
         # 角分布分析
         try:
-            results["angular"] = self.angular(
-                atom_selection=atom_selection, atom_indices=atom_indices, **kwargs
-            )
+            # 角分布分析需要cutoff_radii参数
+            if "cutoff_radii" in kwargs:
+                results["angular"] = self.angular(
+                    atom_selection=atom_selection, atom_indices=atom_indices, **kwargs
+                )
+            else:
+                warnings.warn("Angular analysis requires 'cutoff_radii' parameter")
+                results["angular"] = None
         except Exception as e:
             warnings.warn(f"Angular analysis failed: {e}")
             results["angular"] = None
 
+        # 配位数分析
+        try:
+            # 配位数分析需要cutoff_radii参数
+            if "cutoff_radii" in kwargs:
+                results["coordination"] = self.coordination(
+                    atom_selection=atom_selection, atom_indices=atom_indices, **kwargs
+                )
+            else:
+                warnings.warn("Coordination analysis requires 'cutoff_radii' parameter")
+                results["coordination"] = None
+        except Exception as e:
+            warnings.warn(f"Coordination analysis failed: {e}")
+            results["coordination"] = None
+
         # 扩散分析（待实现）
         results["diffusion"] = None
-
-        # 配位数分析（待实现）
-        results["coordination"] = None
 
         return results
 
@@ -298,8 +386,8 @@ class SingleAtomAnalysis:
         return {
             "rdf": "available",
             "angular": "available",
+            "coordination": "available",
             "diffusion": "not_implemented",
-            "coordination": "not_implemented",
         }
 
     def get_system_info(self):
