@@ -34,3 +34,6 @@ build/
 # examples
 examples/rdf_plots/
 examples/results/
+
+# Macos
+.DS_Store
