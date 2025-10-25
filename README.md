@@ -9,7 +9,7 @@ MDemon 是一个现代化的分子动力学分析框架，提供全面的分析�
 - 🚀 **高性能计算**: 使用 Cython 扩展优化核心算法
 - 📊 **全面分析**: 支持径向分布函数(RDF)、角分布分析等
 - ⚛️ **辐照效应**: 集成 Waligorski-Zhang 计算器用于辐照损伤分析
-- 🔬 **多格式支持**: 兼容 LAMMPS、REAXFF 等主流 MD 文件格式
+- 🔬 **多格式支持**: 兼容 LAMMPS、REAXFF、Extended XYZ 等主流 MD 文件格式
 - 📚 **丰富常数库**: 内置物理、化学、材料常数和单位转换
 - 🔧 **灵活扩展**: 模块化设计，易于扩展和定制
 
@@ -37,21 +37,46 @@ uv pip install -e ".[dev]"
 
 ### 基本使用
 
+#### 读取分子动力学文件
+
 ```python
 import MDemon as md
+
+# 读取 LAMMPS DATA 文件
+u = md.Universe("system.data")
+
+# 读取 Extended XYZ 文件（如 GPUMD 格式）
+u = md.Universe("system.xyz")
+
+# 读取多个文件（DATA + REAXFF）
+u = md.Universe("system.data", "bonds.reaxff")
+
+# 访问原子信息
+print(f"Total atoms: {len(u.atoms)}")
+print(f"First atom coordinate: {u.atoms[0].coordinate}")
+```
+
+#### 使用物理常数
+
+```python
 from MDemon.constants import PHYSICS, CHEMISTRY
-from MDemon.utils import WaligorskiZhangCalculator
-import numpy as np
+from MDemon.constants.utils import convert_energy
 
 # 使用物理常数
 print(f"玻尔兹曼常数: {md.k_B:.6e} J/K")
 print(f"阿伏伽德罗数: {md.N_A:.6e} mol⁻¹")
 
 # 单位转换
-from MDemon.constants.utils import convert_energy
 energy_ev = 1.0
 energy_j = convert_energy(energy_ev, 'eV', 'J')
 print(f"1 eV = {energy_j:.6e} J")
+```
+
+#### 辐照效应分析
+
+```python
+from MDemon.utils import WaligorskiZhangCalculator
+import numpy as np
 
 # 辐照计算示例
 calc = WaligorskiZhangCalculator.from_material_preset('Ga2O3')
@@ -87,6 +112,7 @@ MDemon/
 ├── reader/            # 文件读取器
 │   ├── LAMMPS.py      # LAMMPS 格式
 │   ├── REAXFF.py      # REAXFF 格式
+│   ├── XYZ.py         # Extended XYZ 格式
 │   └── base.py        # 基础读取器
 ├── selection/         # 原子选择工具
 │   └── cylindrical.py # 圆柱形选择
@@ -147,10 +173,20 @@ dose_profile = calc.calculate_radial_dose(
 
 ## 文档和示例
 
-- [常数使用指南](docs/constants_guide.md)
-- [辐照分析指南](IRRADIATION_USAGE.md)
-- [Jupyter 使用指南](JUPYTER_GUIDE.md)
-- [使用示例](examples/)
+### 完整文档
+
+- [文件读取架构指南](docs/file_reading_architecture.md) - MDemon 核心文件读取逻辑详解
+- [XYZ Reader 使用指南](docs/xyz_reader_guide.md) - Extended XYZ 格式读取指南
+- [常数使用指南](docs/constants_guide.md) - 物理化学常数库使用说明
+- [辐照分析指南](IRRADIATION_USAGE.md) - 辐照效应分析教程
+- [Jupyter 使用指南](JUPYTER_GUIDE.md) - 在 Jupyter 中使用 MDemon
+
+### 示例代码
+
+- [XYZ Reader 示例](examples/xyz_reader_example.py) - Extended XYZ 文件读取示例
+- [RDF 分析示例](examples/rdf_analysis_irradiated_kapton.py) - 径向分布函数分析
+- [配位数分析示例](examples/coordination_analysis_example.py) - 配位数分析演示
+- [常数使用示例](examples/constants_usage.py) - 物理常数和单位转换
 
 ## 开发和贡献
 
