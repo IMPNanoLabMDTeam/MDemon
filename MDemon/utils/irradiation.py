@@ -152,6 +152,30 @@ class WaligorskiZhangCalculator:
         energy_per_atom_eV = (normalized_dose * 1000.0) / atomic_density_nm3
         temperature = energy_per_atom_eV * self.eV_to_K
 
+        # Verify energy conservation: radial integral should equal input energy loss * g_factor
+        # Calculate radial integral of normalized dose
+        integrated_energy_keV_per_nm = 0.0
+        for i in range(1, len(radius_array_nm)):
+            dr = radius_array_nm[i] - radius_array_nm[i - 1]
+            ring_area = 2 * np.pi * radius_array_nm[i] * dr
+            ring_energy = normalized_dose[i] * ring_area
+            integrated_energy_keV_per_nm += ring_energy
+
+        # Expected energy: energy_loss_keV_per_um * g_factor (convert um to nm by *1000)
+        expected_energy_keV_per_nm = (
+            self.energy_loss_keV_per_um * self.g_factor / 1000.0
+        )
+
+        # Calculate relative error
+        if expected_energy_keV_per_nm > 0:
+            relative_error = (
+                abs(integrated_energy_keV_per_nm - expected_energy_keV_per_nm)
+                / expected_energy_keV_per_nm
+                * 100
+            )
+        else:
+            relative_error = 0.0
+
         self.results = {
             "radius": radius_array_nm,
             "dose_density": dose_array,
@@ -163,8 +187,29 @@ class WaligorskiZhangCalculator:
             "calculated_energy_loss": (
                 cumulative_energy[-1] if len(cumulative_energy) > 0 else 0
             ),
+            # Energy conservation verification
+            "integrated_energy_keV_per_nm": integrated_energy_keV_per_nm,
+            "expected_energy_keV_per_nm": expected_energy_keV_per_nm,
+            "energy_conservation_error_percent": relative_error,
         }
-        # print(f"dose_density: {self.results['dose_density']}")
+
+        # Print verification results
+        print("\n" + "=" * 60)
+        print("Energy Conservation Verification")
+        print("=" * 60)
+        print(f"Integrated energy (radial):  {integrated_energy_keV_per_nm:.6e} keV/nm")
+        print(f"Expected energy (dE/dx × g): {expected_energy_keV_per_nm:.6e} keV/nm")
+        print(f"Relative error:              {relative_error:.4f} %")
+        if relative_error < 1.0:
+            print("Status: ✓ Energy conservation satisfied (error < 1%)")
+        elif relative_error < 5.0:
+            print("Status: ⚠ Acceptable error (1% < error < 5%)")
+        else:
+            print(
+                "Status: ✗ Large error (> 5%) - consider refining radial grid or checking parameters"
+            )
+        print("=" * 60 + "\n")
+
         return self.results
 
     def save_results(self, filepath=None, include_metadata=True):
@@ -388,7 +433,8 @@ class WaligorskiZhangCalculator:
             f"ρ={self.density_g_per_cm3} g/cm³\n"
             f"Ion: Z={self.ion_Z}, g-factor={self.g_factor}\n"
             f"Atomic density: {self.results['atomic_density']:.2e} nm⁻³\n"
-            f"Calculated energy loss: {self.results['calculated_energy_loss']:.2f} keV·nm"
+            f"Calculated energy loss: {self.results['calculated_energy_loss']:.2f} keV·nm\n"
+            f"Energy conservation error: {self.results['energy_conservation_error_percent']:.3f}%"
         )
 
         fig.text(
